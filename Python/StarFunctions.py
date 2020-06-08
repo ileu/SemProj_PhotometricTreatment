@@ -22,6 +22,9 @@ class OOI:
 
         return self.pos_x, self.pos_y
 
+    def set_local_map(self, image):
+        self.local_map = image.copy()
+
     def count_pixel(self, star_image, filter_val=None, new_bg_removal: bool = False):
 
         if filter_val is None:
@@ -135,6 +138,8 @@ class OOI:
         # ax = fig.add_subplot(1, 2, 2, projection='3d')
         # ax.scatter(x_mesh, y_mesh, img, c=color.flatten(), cmap='viridis')
 
+        return moffat_fit
+
 
 class StarImg:
     def __init__(self, name, img_i, img_r):
@@ -143,9 +148,9 @@ class StarImg:
         self.radial: List[List[float]] = []
         self.azimutal = []
         self.objects: List[OOI] = []
-        self.flux: List[float] = None
+        self.flux: List[float] = []
         self.wavelength: List[float] = []
-        self.filter_reduction: List[float] = None
+        self.filter_reduction: List[float] = []
 
     def set_filter(self, i_filter, r_filter):
         self.filter_reduction = [i_filter, r_filter]
@@ -178,7 +183,9 @@ class StarImg:
             plt.show()
             self.radial.append([q_phi, u_phi])
 
-    def add_object(self, obj):
+    def add_object(self, obj: OOI):
+        obj.set_local_map(self.images[0].data[0][(obj.pos_y - obj.outer_radius):(obj.pos_y + obj.outer_radius),
+                          (obj.pos_x - obj.outer_radius):(obj.pos_x + obj.outer_radius)])
         self.objects.append(obj)
 
     def get_objects(self, text=True):
@@ -233,16 +240,18 @@ class StarImg:
                                 bounds=((0, 0, 0, 0, -np.inf), (5, np.inf, np.inf, np.inf, np.inf)))
             print("Azimuthal profil fitting paramter:")
             print(fitting[0])
-            plt.semilogy(range(0, 512), moffat_1d(range(0, 512), *fitting[0]))
+            plt.semilogy(range(0, 512), moffat_1d(np.arange(0, 512), *fitting[0]))
         except RuntimeError:
             print("The fitting didnt work :(")
+            fitting = None
 
-        return profile, fitting
+        return np.array([np.arange(0, 512), np.array(profile)]), fitting
 
 
 def azimuthal_averaged_profile(image: np.ndarray):
-    radius = 512
-    cx, cy = 512, 512
+    size = image[0].size
+    radius = size//2
+    cx, cy = size//2, size//2
     x, y = np.arange(0, 2 * radius), np.arange(0, 2 * radius)
     img = image.copy()
     profile = []
@@ -254,7 +263,7 @@ def azimuthal_averaged_profile(image: np.ndarray):
 
         img[mask] = 0
 
-    return profile
+    return np.array(profile)
 
 
 def poly_sec_ord(pos, x0, y0, axx, ayy, axy, bx, by, c):
@@ -262,7 +271,9 @@ def poly_sec_ord(pos, x0, y0, axx, ayy, axy, bx, by, c):
             pos[:, 1] - y0) + bx * (pos[:, 0] - x0) + by * (pos[:, 1] - y0) + c
 
 
-def moffat_1d(x, x0, alpha, beta, gamma, b):
+def moffat_1d(x, x0, alpha, beta, gamma, b, offset=True):
+    if not offset:
+        b = 0
     return alpha * (1 + (x - x0) ** 2 / gamma) ** (-beta) + b
 
 

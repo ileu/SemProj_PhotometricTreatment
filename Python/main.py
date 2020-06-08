@@ -115,10 +115,75 @@ PointSpread.add_object(PointSpread_main_star)
 
 # cyc116.azimuthal_fitting("i")
 
-start(cyc116)
+# start(cyc116)
 
 # magnitude_wavelength_plot(HD100453_fluxes, [Iband_filter, Rband_filter])
 
 # cyc116.calc_radial_polarization()
+
+plt.show()
+
+"""  testing star removal """
+radial1, fit1 = cyc116.azimuthal_fitting("i")
+
+radial2, fit2 = ND4.azimuthal_fitting("i")
+
+radial3 = azimuthal_averaged_profile(cyc116_ghost1.local_map)
+fit3 = curve_fit(moffat_1d, range(0, 40), radial3,
+                 bounds=((0, 0, 0, 0, -np.inf), (5, np.inf, np.inf, np.inf, np.inf)))
+plt.figure()
+plt.title("Ghost 1 Azimuthal profile and fit")
+plt.semilogy(range(0, 40), radial3)
+plt.semilogy(range(0, 40), moffat_1d(range(0, 40), *fit3[0]))
+
+radial4, fit4 = PointSpread.azimuthal_fitting("i")
+plt.show()
+""" Test 1 with ND4 """
+
+scaling_factor2 = np.average(radial1[1, 9:18] / radial2[1, 9:18])
+print("scaling factor ND4: ", scaling_factor2)
+
+plt.figure()
+plt.title("Comparison of ND4 to cyc116")
+plt.semilogy(*radial1)
+plt.semilogy(radial2[0], scaling_factor2 * moffat_1d(radial1[0], *fit2[0], offset=False))
+plt.ylim(ymin=1)
+
+plt.figure()
+plt.title("Subtraction of main star ND4")
+plt.semilogy(radial2[0], radial1[1] - scaling_factor2 * moffat_1d(radial1[0], *fit2[0], offset=False))
+
+plt.show()
+
+""" Test 2 with Ghost 1"""
+scaling_factor3 = np.average(radial1[1, 9:18] / moffat_1d(radial1[0, 9:18], *fit3[0], offset=False))
+print("scaling factor Ghost1: ", scaling_factor3)
+
+plt.figure()
+plt.title("Comparison of Ghost1 to cyc116")
+plt.semilogy(*radial1)
+plt.semilogy(radial2[0], scaling_factor3 * moffat_1d(radial1[0], *fit3[0], offset=False))
+plt.ylim(ymin=1)
+
+plt.figure()
+plt.title("Subtraction of main star Ghost1")
+plt.semilogy(radial2[0], radial1[1] - scaling_factor3 * moffat_1d(radial1[0], *fit3[0], offset=False))
+
+plt.show()
+
+""" Test 3 with PSF"""
+
+scaling_factor4 = np.average(radial1[1, 9:18] / radial4[1, 9:18])
+print("scaling factor PSF: ", scaling_factor4)
+
+plt.figure()
+plt.title("Comparison of Ghost1 to PSF")
+plt.semilogy(*radial1)
+plt.semilogy(radial2[0], scaling_factor4 * moffat_1d(radial1[0], *fit4[0], offset=False))
+plt.ylim(ymin=1)
+
+plt.figure()
+plt.title("Subtraction of main star PSF")
+plt.semilogy(radial2[0], radial1[1] - scaling_factor4 * moffat_1d(radial1[0], *fit4[0], offset=False))
 
 plt.show()
