@@ -1,18 +1,21 @@
+from scipy.fftpack import fft
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import RadioButtons
-from StarFunctions import ballestero
 
-data = np.array([[-0.33, -0.32],
-                 [-0.3, -0.29],
-                 [-0.02, -0.02],
-                 [0.3, 0.17],
-                 [0.58, 0.31],
-                 [0.81, 0.42],
-                 [1.4, 0.91]])
 
-fit = np.polyfit(data[:, 1], data[:, 0], 1)
-p = np.poly1d(fit)
-plt.scatter(data[:, 1], data[:, 0])
-plt.plot(data[:, 1], p(data[:, 1]))
+# Number of sample points
+N = 600
+# sample spacing
+T = 1.0 / 800.0
+x = np.linspace(0.0, N * T, N)
+y = np.sin(50.0 * 2.0 * np.pi * x) + 0.5 * np.sin(80.0 * 2.0 * np.pi * x)
+yf = fft(y)
+xf = np.linspace(0.0, 1.0 / (2.0 * T), N // 2)
+
+plt.figure()
+plt.plot(xf, 2.0 / N * np.abs(yf[0:N // 2]))
+plt.grid()
+
+plt.figure()
+plt.plot(x, yf)
 plt.show()

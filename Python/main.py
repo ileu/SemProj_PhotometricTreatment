@@ -1,10 +1,24 @@
 import matplotlib.pyplot as plt
 from scipy import interpolate
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, root_scalar, RootResults
+from scipy.fftpack import fft, ifft
 import numpy as np
 from astropy.io import fits
-from StarFunctions import StarImg, OOI, azimuthal_averaged_profile, moffat_1d
-from StarGUI import start, magnitude_wavelength_plot
+from StarFunctions import StarImg, OOI, azimuthal_averaged_profile, magnitude_wavelength_plot
+import StarGUI
+import DiskGUI
+import gc
+
+# todo: find sigma of ND4 background and estimate if visible; done, see ratio
+# todo: try to recreate hd100453 peak with ND4 image; somewhat but ungh not happy
+
+# todo: compare diffraction rings of the measurements as well as ghost and see if moved; kind of ->
+# todo: calculate flux of disk around hd100453; today
+
+# todo: look for disk in ND4; maybe but might be just imagination
+
+# airy function first zero at 3.8317; second zero at 7.0156; third zero at 13.3237
+# or bessel1/x  first max at 0      ; second max at 5.13568; third max at 8.841724
 
 """ import data """
 
@@ -111,79 +125,65 @@ PointSpread.add_object(PointSpread_main_star)
 
 """ function calls """
 
+# for obj in gc.get_objects():
+#     if isinstance(obj, StarImg):
+#         print(obj.name)
+#         radial, fit = obj.azimuthal_fitting("i")
+#         fig = plt.figure()
+#         plt.title(obj.name)
+#         ax1 = fig.add_subplot(1, 2, 1)
+#         ax1.semilogy(*radial)
+#         ax2 = fig.add_subplot(1, 2, 2)
+#         ax2.plot(radial[0], np.gradient(radial[1]))
+
 # cyc116_third_star.fitting_3d(cyc116.get_i_img()[0])
 
-# cyc116.azimuthal_fitting("i")
-
-# start(cyc116)
+StarGUI.start(ND4)
 
 # magnitude_wavelength_plot(HD100453_fluxes, [Iband_filter, Rband_filter])
 
-# cyc116.calc_radial_polarization()
+# ND4.calc_radial_polarization()
 
-plt.show()
+# plt.show()
 
-"""  testing star removal """
-radial1, fit1 = cyc116.azimuthal_fitting("i")
-
-radial2, fit2 = ND4.azimuthal_fitting("i")
-
-radial3 = azimuthal_averaged_profile(cyc116_ghost1.local_map)
-fit3 = curve_fit(moffat_1d, range(0, 40), radial3,
-                 bounds=((0, 0, 0, 0, -np.inf), (5, np.inf, np.inf, np.inf, np.inf)))
-plt.figure()
-plt.title("Ghost 1 Azimuthal profile and fit")
-plt.semilogy(range(0, 40), radial3)
-plt.semilogy(range(0, 40), moffat_1d(range(0, 40), *fit3[0]))
-
-radial4, fit4 = PointSpread.azimuthal_fitting("i")
-plt.show()
-""" Test 1 with ND4 """
-
-scaling_factor2 = np.average(radial1[1, 9:18] / radial2[1, 9:18])
-print("scaling factor ND4: ", scaling_factor2)
-
-plt.figure()
-plt.title("Comparison of ND4 to cyc116")
-plt.semilogy(*radial1)
-plt.semilogy(radial2[0], scaling_factor2 * moffat_1d(radial1[0], *fit2[0], offset=False))
-plt.ylim(ymin=1)
-
-plt.figure()
-plt.title("Subtraction of main star ND4")
-plt.semilogy(radial2[0], radial1[1] - scaling_factor2 * moffat_1d(radial1[0], *fit2[0], offset=False))
-
-plt.show()
-
-""" Test 2 with Ghost 1"""
-scaling_factor3 = np.average(radial1[1, 9:18] / moffat_1d(radial1[0, 9:18], *fit3[0], offset=False))
-print("scaling factor Ghost1: ", scaling_factor3)
-
-plt.figure()
-plt.title("Comparison of Ghost1 to cyc116")
-plt.semilogy(*radial1)
-plt.semilogy(radial2[0], scaling_factor3 * moffat_1d(radial1[0], *fit3[0], offset=False))
-plt.ylim(ymin=1)
-
-plt.figure()
-plt.title("Subtraction of main star Ghost1")
-plt.semilogy(radial2[0], radial1[1] - scaling_factor3 * moffat_1d(radial1[0], *fit3[0], offset=False))
-
-plt.show()
-
-""" Test 3 with PSF"""
-
-scaling_factor4 = np.average(radial1[1, 9:18] / radial4[1, 9:18])
-print("scaling factor PSF: ", scaling_factor4)
-
-plt.figure()
-plt.title("Comparison of Ghost1 to PSF")
-plt.semilogy(*radial1)
-plt.semilogy(radial2[0], scaling_factor4 * moffat_1d(radial1[0], *fit4[0], offset=False))
-plt.ylim(ymin=1)
-
-plt.figure()
-plt.title("Subtraction of main star PSF")
-plt.semilogy(radial2[0], radial1[1] - scaling_factor4 * moffat_1d(radial1[0], *fit4[0], offset=False))
+# """  testing star removal """
+# radial1, fit1 = cyc116.azimuthal_fitting("i")
+#
+# radial2, fit2 = ND4.azimuthal_fitting("i")
+# plt.show()
+# """ Test 1 with ND4 """
+# print(radial1[1, 8:28])
+# scaling_factor1 = np.average(radial1[1, 8:28] / radial2[1, 8:28])
+# print("scaling factor ND4: ", scaling_factor1)
+# scaling_func = lambda x, c: c * x
+#
+# scaling_factor2 = curve_fit(scaling_func, radial2[1], radial1[1])
+# print("scaling factor 2", scaling_factor2)
+#
+# plt.figure()
+# plt.title("Comparison of ND4 to cyc116")
+# plt.semilogy(*radial1[:, 8:28], 'C3')
+# plt.semilogy(*radial1[:, :8], 'C0')
+# plt.semilogy(*radial1[:, 28:], 'C0')
+# plt.semilogy(radial2[0], scaling_factor1 * radial2[1], 'C1')
+# plt.semilogy([0, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], 'C2--')
+# plt.ylim(ymin=1)
+#
+# plt.figure()
+# plt.title("Comparison of ND4 to cyc116")
+# plt.semilogy(*radial1)
+# plt.semilogy(radial2[0], scaling_factor2[0] * radial2[1])
+# plt.semilogy([0, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], 'g--')
+# plt.ylim(ymin=1)
+#
+# first_der = np.gradient(radial1[1])
+# second_der = np.gradient(first_der)
+# second_derivative = interpolate.interp1d(radial1[0], second_der)
+# zeros = root_scalar(second_derivative, x0=20, x1=25)
+#
+# plt.figure()
+# plt.plot(radial1[0, 15:80], first_der[15:80])
+#
+# print(zeros)
 
 plt.show()

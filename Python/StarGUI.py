@@ -11,7 +11,6 @@ plt.rcParams["image.origin"] = 'lower'
 
 def start(star_data: StarImg):
     # Start parameters
-
     ir0 = 16  # maybe 21
     or0 = 12
     rinner = ir0
@@ -40,7 +39,7 @@ def start(star_data: StarImg):
 
     Star_Data = star_data
 
-    starmap = Star_Data.show_objects(ir0, or0)
+    starmap = Star_Data.mark_objects(ir0, or0)
 
     StarPlot = ax.imshow(starmap)
 
@@ -53,7 +52,7 @@ def start(star_data: StarImg):
     button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
 
     for index, obj in enumerate(Star_Data.objects):
-        textax = plt.axes([0.65 - 0.1 * (-1) ** index, 0.6 - 0.2 * np.floor(index / 2), 0.3, 0.03])
+        textax = plt.axes([0.65 - 0.1 * (-1) ** index, 0.62 - 0.21 * np.floor(index / 2), 0.3, 0.03])
         textax.axis('off')
         obj.count = [ir0, or0]
         total_counts, bg_counts, bg_avgs = obj.count_pixel(Star_Data, filter_val=Star_Data.filter_reduction)
@@ -64,7 +63,8 @@ def start(star_data: StarImg):
                     textax.text(0, -2, "Total Count:  {:.0f}   {:.0f}".format(*total_counts)),
                     textax.text(0, -3, "Average BG:  {:.0f}   {:.0f}".format(*bg_avgs)),
                     textax.text(0, -4, "Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts)),
-                    textax.text(0, -5, "Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, magnitude))]
+                    textax.text(0, -5, "Relativ reduction:  {:.4f}   {:.4f}".format(*(bg_counts / total_counts))),
+                    textax.text(0, -6, "Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, magnitude))]
         textaxes.append(textaxis)
 
     # interaction function
@@ -76,7 +76,8 @@ def start(star_data: StarImg):
             text[2].set_text("Total Count:  {:.0f}   {:.0f}".format(*total_counts))
             text[3].set_text("Average BG:  {:.0f}   {:.0f}".format(*bg_avgs))
             text[4].set_text("Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts))
-            text[5].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, 2.5 * np.log10(ratio)))
+            text[5].set_text("Relativ reduction:  {:.4f}   {:.4f}".format(*(bg_counts / total_counts))),
+            text[6].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, 2.5 * np.log10(ratio)))
 
     def reset(event):
         sinner.reset()
@@ -84,21 +85,23 @@ def start(star_data: StarImg):
         fig.canvas.draw_idle()
 
     def update(val):
-        old_rin = sinner.val
-        old_rout = souter.val
+        nonlocal rinner, router
+        rinner = sinner.val
+        router = souter.val
 
-        StarPlot.set_data(Star_Data.show_objects(old_rin, old_rout, band=waveband))
+        StarPlot.set_data(Star_Data.mark_objects(rinner, router, band=waveband))
         update_count()
 
         fig.canvas.draw()
 
-    def change_band(band, label):
+    def change_band(label):
+        # print("Click")
         if label == 'I\'-band':
             band = 'I'
-            StarPlot.set_data(Star_Data.show_objects(rinner, router, band=band))
+            StarPlot.set_data(Star_Data.mark_objects(rinner, router, band=band))
         elif label == 'R\'-band':
             band = 'R'
-            StarPlot.set_data(Star_Data.show_objects(rinner, router, band=band))
+            StarPlot.set_data(Star_Data.mark_objects(rinner, router, band=band))
         else:
             raise ValueError("How is this even possible...")
 
@@ -111,19 +114,6 @@ def start(star_data: StarImg):
 
     radio.on_clicked(change_band)
 
-    print("Ready")
+    # print("Ready")
 
-
-def magnitude_wavelength_plot(fix_points, x):
-    fit = np.polyfit(fix_points[:, 1], fix_points[:, 0], 1)
-    p = np.poly1d(fit)
-    plt.figure()
-    plt.scatter(fix_points[:, 1], fix_points[:, 0], label="Star Fluxes")
-    plt.scatter(x, p(x), label="Filter central wavelength", zorder=2)
-    plt.plot([400, 2200], p([400, 2200]), c='green', label="fit: " + str(p), zorder=0)
-    plt.legend()
-    plt.xlabel("Wavelength in nm")
-    plt.ylabel("Stellar Magnitude")
-    print(p)
-    print(p(x))
-    print(p(x[1]) - p(x[0]))
+    plt.show()

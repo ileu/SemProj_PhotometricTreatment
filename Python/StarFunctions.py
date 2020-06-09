@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from typing import List
 from scipy.optimize import curve_fit
+from scipy.special import airy  # only use first output
 import numpy as np
+import mayavi.mlab as mlab
 
 plt.rcParams["image.origin"] = 'lower'
 
@@ -25,7 +28,7 @@ class OOI:
     def set_local_map(self, image):
         self.local_map = image.copy()
 
-    def count_pixel(self, star_image, filter_val=None, new_bg_removal: bool = False):
+    def count_pixel(self, star_image, filter_val=None):
 
         if filter_val is None:
             filter_val = [1, 1]
@@ -36,19 +39,19 @@ class OOI:
 
         for n, image in enumerate(star_image.images):
             for c in (0,):
-
                 img = image.data[c, :, :].copy()
                 img[img < 0] = 0
                 _, total_count, bg_count, bg_avg = aperture(*self.get_pos(False), *self.get_radius(), img)
-                if filter_val is not None:
-                    total_count /= filter_val[n]
-                    bg_count /= filter_val[n]
-                    bg_avg /= filter_val[n]
+
+                total_count /= filter_val[n]
+                bg_count /= filter_val[n]
+                bg_avg /= filter_val[n]
+
                 total_counts.append(total_count)
                 bg_counts.append(bg_count)
                 bg_avgs.append(bg_avg)
 
-        return total_counts, bg_counts, bg_avgs
+        return np.array(total_counts), np.array(bg_counts), np.array(bg_avgs)
 
     def get_count(self):
         return self.count, (self.name + ":\n", "I'-band count: {} \nR'-band count: {}".format(*self.count))
@@ -109,12 +112,19 @@ class OOI:
         ax.scatter(mask[:, 0], mask[:, 1], mask[:, 2])
         ax.scatter(mesh[:, 0], mesh[:, 1], fitted_val, c=color, alpha=0.4)
 
+        mlab.figure(figure=self.name + " background removal")
+        mlab.points3d(mask[:, 0], mask[:, 1], mask[:, 2], scale_mode="none", scale_factor=1)
+        mlab.points3d(mesh[:, 0], mesh[:, 1], fitted_val.flatten(), color, scale_mode="none", scale_factor=1)
+
         """ Image without background """
 
         fig = plt.figure(figsize=(8, 8), num=self.name + " final")
         fig.suptitle(self.name + " without background")
         ax = fig.add_subplot(1, 1, 1, projection='3d')
         ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
+
+        mlab.figure(figure=self.name + " final")
+        mlab.surf(img - fitted_val)
 
         """ moffat fit """
 
@@ -124,8 +134,14 @@ class OOI:
         fig = plt.figure(figsize=(8, 8), num=self.name + " woBG + fit")
         fig.suptitle(self.name + " without background and fit")
         ax = fig.add_subplot(1, 1, 1, projection='3d')
-        ax.scatter(mesh[:, 0], mesh[:, 1], img - np.array(fitted_val).reshape((80, 80)))
+        ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
         ax.scatter(mesh[:, 0], mesh[:, 1], moffat_2d(mesh, *moffat_fit[0]))
+
+        mlab.figure(figure=self.name + " woBG + fit")
+        mlab.points3d(mesh[:, 0], mesh[:, 1], (img - fitted_val).flatten(), color=(0, 0, 1), scale_mode="none",
+                      scale_factor=1.75)
+        mlab.points3d(mesh[:, 0], mesh[:, 1], moffat_2d(mesh, *moffat_fit[0]), color=(1, 165 / 255, 0),
+                      scale_mode="none", scale_factor=1.75)
 
         # plt.figure()
         # print("test")
@@ -179,7 +195,7 @@ class StarImg:
             q_phi = -img.data[1] * cos_2phi + img.data[3] * sin_2phi
             u_phi = img.data[1] * sin_2phi + img.data[3] * cos_2phi
             plt.figure()
-            plt.imshow(u_phi, cmap='gray', vmin=-50, vmax=100)
+            plt.imshow(q_phi, cmap='gray', vmin=-50, vmax=100)
             plt.show()
             self.radial.append([q_phi, u_phi])
 
@@ -197,7 +213,12 @@ class StarImg:
 
         return self.objects
 
-    def show_objects(self, inner_radius, outer_radius, band='I', showPlot=False):
+    def mark_disk(self, inner_radius, middle_radius, outer_radius, band):
+        self.calc_radial_polarization()
+
+        return None
+
+    def mark_objects(self, inner_radius, outer_radius, band='I', showPlot=False):
         a = 1000
         if band == 'I':
             img = self.images[0].data[0, :, :].copy()
@@ -231,27 +252,27 @@ class StarImg:
             raise ValueError("Wrong image name")
         profile = azimuthal_averaged_profile(img)
 
-        plt.figure()
-        plt.title(self.name + " Azimuthal profile and fit")
-        plt.semilogy(range(0, 512), profile)
+        # plt.figure()
+        # plt.title(self.name + " Azimuthal profile and fit")
+        # plt.semilogy(range(0, 512), profile)
 
         try:
-            fitting = curve_fit(moffat_1d, range(0, 450), profile[:450],
+            fitting = curve_fit(moffat_1d, *profile,
                                 bounds=((0, 0, 0, 0, -np.inf), (5, np.inf, np.inf, np.inf, np.inf)))
             print("Azimuthal profil fitting paramter:")
             print(fitting[0])
-            plt.semilogy(range(0, 512), moffat_1d(np.arange(0, 512), *fitting[0]))
+            # plt.semilogy(range(0, 512), moffat_1d(np.arange(0, 512), *fitting[0]))
         except RuntimeError:
             print("The fitting didnt work :(")
             fitting = None
 
-        return np.array([np.arange(0, 512), np.array(profile)]), fitting
+        return np.array(profile), fitting
 
 
 def azimuthal_averaged_profile(image: np.ndarray):
     size = image[0].size
-    radius = size//2
-    cx, cy = size//2, size//2
+    radius = size // 2
+    cx, cy = size // 2, size // 2
     x, y = np.arange(0, 2 * radius), np.arange(0, 2 * radius)
     img = image.copy()
     profile = []
@@ -263,7 +284,36 @@ def azimuthal_averaged_profile(image: np.ndarray):
 
         img[mask] = 0
 
-    return np.array(profile)
+    return np.arange(0, radius), np.array(profile)
+
+
+def half_azimuthal_averaged_profile(image: np.ndarray):
+    size = image[0].size
+    radius = size // 2
+    cx, cy = size // 2, size // 2
+    x, y = np.arange(0, 2 * radius), np.arange(0, 2 * radius)
+    img = image.copy()
+    profile = []
+    for r in range(0, radius):
+        neg_mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2 and x[np.newaxis, :] < 0
+        pos_mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2 and x[np.newaxis, :] >= 0
+
+    return np.arange(-radius, radius), np.array(profile)
+
+
+def magnitude_wavelength_plot(fix_points, x):
+    fit = np.polyfit(fix_points[:, 1], fix_points[:, 0], 1)
+    p = np.poly1d(fit)
+    plt.figure()
+    plt.scatter(fix_points[:, 1], fix_points[:, 0], label="Star Fluxes")
+    plt.scatter(x, p(x), label="Filter central wavelength", zorder=2)
+    plt.plot([400, 2200], p([400, 2200]), c='green', label="fit: " + str(p), zorder=0)
+    plt.legend()
+    plt.xlabel("Wavelength in nm")
+    plt.ylabel("Stellar Magnitude")
+    print(p)
+    print(p(x))
+    print(p(x[1]) - p(x[0]))
 
 
 def poly_sec_ord(pos, x0, y0, axx, ayy, axy, bx, by, c):
