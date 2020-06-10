@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from typing import List
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, least_squares
+from scipy import interpolate
 from scipy.special import airy  # only use first output
 import numpy as np
 import mayavi.mlab as mlab
@@ -10,12 +11,10 @@ plt.rcParams["image.origin"] = 'lower'
 
 
 class OOI:
-    def __init__(self, name, pos_x, pos_y, inner_radius=25, outer_radius=40):
+    def __init__(self, name, pos_x, pos_y):
         self.name = name
         self.pos_x = pos_x
         self.pos_y = pos_y
-        self.inner_radius = inner_radius
-        self.outer_radius = outer_radius
         self.count = [0, 0]
         self.local_map = []
 
@@ -28,7 +27,7 @@ class OOI:
     def set_local_map(self, image):
         self.local_map = image.copy()
 
-    def count_pixel(self, star_image, filter_val=None):
+    def count_pixel(self, star_image, inner_radius=25, outer_radius=40, filter_val=None):
 
         if filter_val is None:
             filter_val = [1, 1]
@@ -41,7 +40,7 @@ class OOI:
             for c in (0,):
                 img = image.data[c, :, :].copy()
                 img[img < 0] = 0
-                _, total_count, bg_count, bg_avg = aperture(*self.get_pos(False), *self.get_radius(), img)
+                _, total_count, bg_count, bg_avg = aperture(*self.get_pos(False), inner_radius, outer_radius, img)
 
                 total_count /= filter_val[n]
                 bg_count /= filter_val[n]
@@ -55,23 +54,6 @@ class OOI:
 
     def get_count(self):
         return self.count, (self.name + ":\n", "I'-band count: {} \nR'-band count: {}".format(*self.count))
-
-    def set_radius(self, inrad, outrad):
-        self.inner_radius = inrad
-        self.outer_radius = inrad + outrad
-
-    def get_radius(self):
-        return self.inner_radius, self.outer_radius
-
-    def obj_plot(self, image, ax):
-        img = image.copy()
-
-        x_mesh, y_mesh = np.meshgrid(range(2 * self.outer_radius), range(2 * self.outer_radius))
-
-        ax.plot_surface(x_mesh, y_mesh, img[(self.pos_y - self.outer_radius):(self.pos_y + self.outer_radius),
-                                        (self.pos_x - self.outer_radius):(self.pos_x + self.outer_radius)],
-                        cmap='viridis')
-        ax.set_title(self.name)
 
     def fitting_3d(self, image):
         img = image.copy()[(self.pos_y - self.outer_radius):(self.pos_y + self.outer_radius),
@@ -161,7 +143,8 @@ class StarImg:
     def __init__(self, name, img_i, img_r):
         self.name: str = name
         self.images = np.array([img_i, img_r])
-        self.radial: List[List[float]] = []
+        self.disk: OOI = None
+        self.radial: np.array = []
         self.azimutal = []
         self.objects: List[OOI] = []
         self.flux: List[float] = []
@@ -183,25 +166,31 @@ class StarImg:
     def get_r_img(self):
         return self.images[1].data
 
+    def set_disk(self, disk):
+        self.disk = disk
+
     def calc_radial_polarization(self):
         images_copy = self.images
         x, y = np.meshgrid(range(0, 1024), range(0, 1024))
-        angle_phi = phi(x, y, 512, 512)
+        phi = angle_phi(x, y, 512, 512)
 
-        sin_2phi = np.sin(2 * angle_phi)
-        cos_2phi = np.cos(2 * angle_phi)
+        sin_2phi = np.sin(2 * phi)
+        cos_2phi = np.cos(2 * phi)
+        radial = []
 
         for img in images_copy:
             q_phi = -img.data[1] * cos_2phi + img.data[3] * sin_2phi
             u_phi = img.data[1] * sin_2phi + img.data[3] * cos_2phi
-            plt.figure()
-            plt.imshow(q_phi, cmap='gray', vmin=-50, vmax=100)
-            plt.show()
-            self.radial.append([q_phi, u_phi])
+            # plt.figure()
+            # plt.imshow(q_phi, cmap='gray', vmin=-50, vmax=100)
+            # plt.show()
+            radial.append([q_phi, u_phi])
+
+        self.radial = np.array(radial)
 
     def add_object(self, obj: OOI):
-        obj.set_local_map(self.images[0].data[0][(obj.pos_y - obj.outer_radius):(obj.pos_y + obj.outer_radius),
-                          (obj.pos_x - obj.outer_radius):(obj.pos_x + obj.outer_radius)])
+        # obj.set_local_map(self.images[0].data[0][(obj.pos_y - obj.outer_radius):(obj.pos_y + obj.outer_radius),
+        #                   (obj.pos_x - obj.outer_radius):(obj.pos_x + obj.outer_radius)])
         self.objects.append(obj)
 
     def get_objects(self, text=True):
@@ -213,10 +202,61 @@ class StarImg:
 
         return self.objects
 
-    def mark_disk(self, inner_radius, middle_radius, outer_radius, band):
+    def mark_disk(self, inner_radius, middle_radius, outer_radius, band='I'):
+        if self.disk is None:
+            raise ValueError("Please assign a disk first")
+
         self.calc_radial_polarization()
 
-        return None
+        total_counts = []
+        wo_bg_counts = []
+        background_avgs = []
+
+        radial_copy: np.ndarray = self.radial.copy()
+        frame, phi, h, w = radial_copy.shape
+
+        y, x = np.ogrid[:h, :w]
+        radius = np.sqrt((x - self.disk.pos_x) ** 2 + (y - self.disk.pos_y) ** 2)
+        radius = np.array(radius)
+
+        mask1 = (inner_radius <= radius) & (radius <= middle_radius)
+        obj_pixel = np.count_nonzero(mask1)
+
+        mask2 = (middle_radius < radius) & (radius <= outer_radius)
+        background_pixel = np.count_nonzero(mask2)
+
+        for img in radial_copy:
+            # plt.figure()
+            # plt.imshow(img[0]*mask1, cmap='gray', vmin=-50, vmax=100)
+            # print(img[0, 512, 512], (mask2 * img[0])[512, 512])
+            # plt.show()
+            total_counts.append(np.sum(mask1 * img[0]))
+            background_avgs.append(np.sum(mask2 * img[0]) / background_pixel)
+            wo_bg_counts.append(total_counts[-1] - background_avgs[-1] * obj_pixel)
+
+        # for x in range(0, 2 * outer_radius + 1):
+        #     for y in range(0, 2 * outer_radius + 1):
+        #         if inner_radius ** 2 <= (x - outer_radius) ** 2 + (y - outer_radius) ** 2 <= middle_radius ** 2:
+        #             img_copy[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x] *= 0.99
+        #             obj_count += img[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x]
+        #             obj_pixel += 1
+        #         if middle_radius ** 2 < (x - outer_radius) ** 2 + (y - outer_radius) ** 2 <= outer_radius ** 2:
+        #             img_copy[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x] *= 0.8
+        #             background_count += img[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x]
+        #             background_pixel += 1
+
+        if band == "I":
+            radial_copy[0, 0][mask1] *= 0.65
+            radial_copy[0, 0][mask2] *= 0.3
+            return np.array(radial_copy[0, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
+                background_avgs)
+        elif band == "R":
+            radial_copy[1, 0][mask1] *= 0.65
+            radial_copy[1, 0][mask2] *= 0.3
+            return np.array(radial_copy[1, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
+                background_avgs)
+        else:
+            raise ValueError("ABORT wrong input")
 
     def mark_objects(self, inner_radius, outer_radius, band='I', showPlot=False):
         a = 1000
@@ -227,10 +267,9 @@ class StarImg:
         else:
             raise ValueError("ABORT wrong input")
 
-        img[img < 0] = 0
+        # img[img < 0] = 0
         img = np.log(a * img + 1) / np.log(a)
         for obj in self.objects:
-            obj.set_radius(inner_radius, outer_radius)
             img, _, _, _ = aperture(*obj.get_pos(False), inner_radius, outer_radius, img)
 
         if showPlot:
@@ -341,8 +380,13 @@ def ballestero(bv):
     return 4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62))
 
 
-def phi(x, y, x0, y0):
-    return np.arctan((x - x0) / (y - y0))
+def angle_phi(x, y, x0, y0):
+    size = len(y)
+    out = np.zeros((size, size))
+    out[:, :size // 2] = -np.inf
+    out[:, size // 2 + 1:] = np.inf
+    results = np.true_divide(x - x0, y - y0, out=out, where=(x == x) & (y != size // 2))
+    return np.arctan(results)
 
 
 def aperture(pos_x, pos_y, inner_radius, outer_radius, img):
@@ -379,3 +423,17 @@ def aperture(pos_x, pos_y, inner_radius, outer_radius, img):
     obj_wo_background = obj_count - background_avg * obj_pixel
 
     return img_copy, obj_count, obj_wo_background, background_avg
+
+
+def diffraction_rings(profile: np.ndarray, estimate: int, width: int = 6):
+    size = len(profile)
+    first_deriv = np.gradient(profile)
+    second_deriv = np.gradient(first_deriv)
+    estimates = np.arange(estimate - width, estimate + width)
+    sec_deriv_func = interpolate.interp1d(np.arange(0, size), second_deriv)
+
+    def sec_deriv_sq(x):
+        return sec_deriv_func(x) ** 2
+
+    zeros = least_squares(sec_deriv_sq, estimates, bounds=(1, estimate + width))
+    return zeros.x, sec_deriv_sq(zeros.x)

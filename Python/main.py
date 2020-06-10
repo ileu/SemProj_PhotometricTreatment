@@ -4,16 +4,16 @@ from scipy.optimize import curve_fit, root_scalar, RootResults
 from scipy.fftpack import fft, ifft
 import numpy as np
 from astropy.io import fits
-from StarFunctions import StarImg, OOI, azimuthal_averaged_profile, magnitude_wavelength_plot
+from StarFunctions import StarImg, OOI, azimuthal_averaged_profile, magnitude_wavelength_plot, diffraction_rings
 import StarGUI
 import DiskGUI
 import gc
 
 # todo: find sigma of ND4 background and estimate if visible; done, see ratio
 # todo: try to recreate hd100453 peak with ND4 image; somewhat but ungh not happy
+# todo: calculate flux of disk around hd100453; done
 
 # todo: compare diffraction rings of the measurements as well as ghost and see if moved; kind of ->
-# todo: calculate flux of disk around hd100453; today
 
 # todo: look for disk in ND4; maybe but might be just imagination
 
@@ -80,18 +80,21 @@ cyc116_third_star = OOI("Third star", 298, 724)
 cyc116_ghost1 = OOI("Ghost 1", 237, 386)
 cyc116_ghost2 = OOI("Ghost 2", 891, 598)
 cyc116_main_star = OOI("Main Star", 511, 512)
+cyc116_disk = OOI("Disk", 512, 512)
 
 ND4_second_star = OOI("Second star", 301, 307)
 ND4_third_star = OOI("Third star", 298, 724)
 ND4_ghost1 = OOI("Ghost 1", 237, 386)
 ND4_ghost2 = OOI("Ghost 2", 891, 598)
-ND4_main_star = OOI("Main Star", 512, 512)
+ND4_main_star = OOI("Main Star", 509, 509)
 
 cyc116.add_object(cyc116_second_star)
 cyc116.add_object(cyc116_third_star)
 cyc116.add_object(cyc116_ghost1)
 cyc116.add_object(cyc116_ghost2)
 cyc116.add_object(cyc116_main_star)
+
+cyc116.set_disk(cyc116_disk)
 
 # ND4.add_object(ND4_second_star)
 # ND4.add_object(ND4_third_star)
@@ -125,24 +128,38 @@ PointSpread.add_object(PointSpread_main_star)
 
 """ function calls """
 
-# for obj in gc.get_objects():
-#     if isinstance(obj, StarImg):
-#         print(obj.name)
-#         radial, fit = obj.azimuthal_fitting("i")
-#         fig = plt.figure()
-#         plt.title(obj.name)
-#         ax1 = fig.add_subplot(1, 2, 1)
-#         ax1.semilogy(*radial)
-#         ax2 = fig.add_subplot(1, 2, 2)
-#         ax2.plot(radial[0], np.gradient(radial[1]))
+for obj in gc.get_objects():
+    if isinstance(obj, StarImg):
+        print(obj.name)
+        x, radial = azimuthal_averaged_profile(obj.get_i_img()[0])
+        fig = plt.figure()
+        plt.title(obj.name)
+        ax1 = fig.add_subplot(1, 3, 1)
+        ax1.semilogy(x, radial)
+        ax2 = fig.add_subplot(1, 3, 2)
+        ax2.plot(x, np.gradient(radial))
+        ax3 = fig.add_subplot(1, 3, 3)
+        sec = np.gradient(np.gradient(radial))
+        sec_deriv_func = interpolate.interp1d(x, sec)
+
+
+        def sec_deriv_sq(x):
+            return sec_deriv_func(x) ** 2
+
+
+        thin = np.linspace(0, 500, 10000)
+        ax3.plot(thin, sec_deriv_sq(thin))
+        results = diffraction_rings(radial, 22)
+        print(np.array2string(results[0], precision=2))
+        print(np.array2string(results[1], precision=2))
+        plt.show()
+
+# StarGUI.start(ND4)
+
+
+# DiskGUI.start(cyc116)
 
 # cyc116_third_star.fitting_3d(cyc116.get_i_img()[0])
-
-StarGUI.start(ND4)
-
-# magnitude_wavelength_plot(HD100453_fluxes, [Iband_filter, Rband_filter])
-
-# ND4.calc_radial_polarization()
 
 # plt.show()
 
