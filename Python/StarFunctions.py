@@ -181,16 +181,11 @@ class StarImg:
         for img in images_copy:
             q_phi = -img.data[1] * cos_2phi + img.data[3] * sin_2phi
             u_phi = img.data[1] * sin_2phi + img.data[3] * cos_2phi
-            # plt.figure()
-            # plt.imshow(q_phi, cmap='gray', vmin=-50, vmax=100)
-            # plt.show()
             radial.append([q_phi, u_phi])
 
         self.radial = np.array(radial)
 
     def add_object(self, obj: OOI):
-        # obj.set_local_map(self.images[0].data[0][(obj.pos_y - obj.outer_radius):(obj.pos_y + obj.outer_radius),
-        #                   (obj.pos_x - obj.outer_radius):(obj.pos_x + obj.outer_radius)])
         self.objects.append(obj)
 
     def get_objects(self, text=True):
@@ -226,33 +221,18 @@ class StarImg:
         background_pixel = np.count_nonzero(mask2)
 
         for img in radial_copy:
-            # plt.figure()
-            # plt.imshow(img[0]*mask1, cmap='gray', vmin=-50, vmax=100)
-            # print(img[0, 512, 512], (mask2 * img[0])[512, 512])
-            # plt.show()
             total_counts.append(np.sum(mask1 * img[0]))
             background_avgs.append(np.sum(mask2 * img[0]) / background_pixel)
             wo_bg_counts.append(total_counts[-1] - background_avgs[-1] * obj_pixel)
 
-        # for x in range(0, 2 * outer_radius + 1):
-        #     for y in range(0, 2 * outer_radius + 1):
-        #         if inner_radius ** 2 <= (x - outer_radius) ** 2 + (y - outer_radius) ** 2 <= middle_radius ** 2:
-        #             img_copy[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x] *= 0.99
-        #             obj_count += img[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x]
-        #             obj_pixel += 1
-        #         if middle_radius ** 2 < (x - outer_radius) ** 2 + (y - outer_radius) ** 2 <= outer_radius ** 2:
-        #             img_copy[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x] *= 0.8
-        #             background_count += img[self.disk.pos_y - outer_radius + y, self.disk.pos_x - outer_radius + x]
-        #             background_pixel += 1
-
         if band == "I":
-            radial_copy[0, 0][mask1] *= 0.65
-            radial_copy[0, 0][mask2] *= 0.3
+            radial_copy[0, 0][mask1] *= 3
+            radial_copy[0, 0][mask2] *= 5
             return np.array(radial_copy[0, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
                 background_avgs)
         elif band == "R":
-            radial_copy[1, 0][mask1] *= 0.65
-            radial_copy[1, 0][mask2] *= 0.3
+            radial_copy[1, 0][mask1] *= 3
+            radial_copy[1, 0][mask2] *= 5
             return np.array(radial_copy[1, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
                 background_avgs)
         else:
@@ -332,12 +312,22 @@ def half_azimuthal_averaged_profile(image: np.ndarray):
     cx, cy = size // 2, size // 2
     x, y = np.arange(0, 2 * radius), np.arange(0, 2 * radius)
     img = image.copy()
-    profile = []
+    neg_profile = []
+    pos_profile = []
     for r in range(0, radius):
-        neg_mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2 and x[np.newaxis, :] < 0
-        pos_mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2 and x[np.newaxis, :] >= 0
+        neg_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & (x[np.newaxis, :] < radius)
+        pos_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & (
+                x[np.newaxis, :] >= radius)
+        neg_half = img * neg_mask
+        pos_half = img * pos_mask
+        neg_profile.append(np.average(neg_half[neg_half != 0]))
+        pos_profile.append(np.average(pos_half[pos_half != 0]))
+        img[neg_mask] = 0
+        img[pos_mask] = 0
 
-    return np.arange(-radius, radius), np.array(profile)
+    plt.show()
+
+    return np.arange(-radius, radius), np.array([*neg_profile[::-1], *pos_profile])
 
 
 def magnitude_wavelength_plot(fix_points, x):

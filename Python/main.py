@@ -4,7 +4,8 @@ from scipy.optimize import curve_fit, root_scalar, RootResults
 from scipy.fftpack import fft, ifft
 import numpy as np
 from astropy.io import fits
-from StarFunctions import StarImg, OOI, azimuthal_averaged_profile, magnitude_wavelength_plot, diffraction_rings
+from StarFunctions import StarImg, OOI, azimuthal_averaged_profile, magnitude_wavelength_plot, diffraction_rings, \
+    half_azimuthal_averaged_profile
 import StarGUI
 import DiskGUI
 import gc
@@ -80,13 +81,13 @@ cyc116_third_star = OOI("Third star", 298, 724)
 cyc116_ghost1 = OOI("Ghost 1", 237, 386)
 cyc116_ghost2 = OOI("Ghost 2", 891, 598)
 cyc116_main_star = OOI("Main Star", 511, 512)
-cyc116_disk = OOI("Disk", 512, 512)
+cyc116_disk = OOI("Disk", 509, 509)
 
 ND4_second_star = OOI("Second star", 301, 307)
 ND4_third_star = OOI("Third star", 298, 724)
 ND4_ghost1 = OOI("Ghost 1", 237, 386)
 ND4_ghost2 = OOI("Ghost 2", 891, 598)
-ND4_main_star = OOI("Main Star", 509, 509)
+ND4_main_star = OOI("Main Star", 512, 512)
 
 cyc116.add_object(cyc116_second_star)
 cyc116.add_object(cyc116_third_star)
@@ -133,12 +134,14 @@ for obj in gc.get_objects():
         print(obj.name)
         x, radial = azimuthal_averaged_profile(obj.get_i_img()[0])
         fig = plt.figure()
-        plt.title(obj.name)
-        ax1 = fig.add_subplot(1, 3, 1)
+        ax1 = fig.add_subplot(131)
+        ax1.set_title("azimuthal rofile")
         ax1.semilogy(x, radial)
-        ax2 = fig.add_subplot(1, 3, 2)
+        ax2 = fig.add_subplot(132)
+        ax2.set_title("first derivative")
         ax2.plot(x, np.gradient(radial))
-        ax3 = fig.add_subplot(1, 3, 3)
+        ax3 = fig.add_subplot(133)
+        ax3.set_title("second derivative")
         sec = np.gradient(np.gradient(radial))
         sec_deriv_func = interpolate.interp1d(x, sec)
 
@@ -152,10 +155,13 @@ for obj in gc.get_objects():
         results = diffraction_rings(radial, 22)
         print(np.array2string(results[0], precision=2))
         print(np.array2string(results[1], precision=2))
+
+        textax = plt.axes([0.5,0.95,0.3,0.03])
+        textax.axis('off')
+        textax.text(0, 0, obj.name, fontsize=18, ha='center')
         plt.show()
 
 # StarGUI.start(ND4)
-
 
 # DiskGUI.start(cyc116)
 
@@ -163,13 +169,12 @@ for obj in gc.get_objects():
 
 # plt.show()
 
-# """  testing star removal """
+# """  test 1 """
 # radial1, fit1 = cyc116.azimuthal_fitting("i")
 #
 # radial2, fit2 = ND4.azimuthal_fitting("i")
 # plt.show()
 # """ Test 1 with ND4 """
-# print(radial1[1, 8:28])
 # scaling_factor1 = np.average(radial1[1, 8:28] / radial2[1, 8:28])
 # print("scaling factor ND4: ", scaling_factor1)
 # scaling_func = lambda x, c: c * x
@@ -178,29 +183,42 @@ for obj in gc.get_objects():
 # print("scaling factor 2", scaling_factor2)
 #
 # plt.figure()
-# plt.title("Comparison of ND4 to cyc116")
-# plt.semilogy(*radial1[:, 8:28], 'C3')
-# plt.semilogy(*radial1[:, :8], 'C0')
-# plt.semilogy(*radial1[:, 28:], 'C0')
-# plt.semilogy(radial2[0], scaling_factor1 * radial2[1], 'C1')
-# plt.semilogy([0, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], 'C2--')
+# plt.title("Comparison 1 of ND4 to cyc116 manual")
+# plt.semilogy(*radial1, label="profile of cyc116")
+# plt.semilogy(radial2[0], scaling_factor1 * radial2[1], label="scaled profile of ND4")
+# plt.semilogy([0, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], '--',
+#              label="max value of cyc116")
+# plt.legend()
 # plt.ylim(ymin=1)
 #
 # plt.figure()
-# plt.title("Comparison of ND4 to cyc116")
+# plt.title("Comparison 1 of ND4 to cyc116 wtih fit")
 # plt.semilogy(*radial1)
 # plt.semilogy(radial2[0], scaling_factor2[0] * radial2[1])
 # plt.semilogy([0, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], 'g--')
 # plt.ylim(ymin=1)
 #
-# first_der = np.gradient(radial1[1])
-# second_der = np.gradient(first_der)
-# second_derivative = interpolate.interp1d(radial1[0], second_der)
-# zeros = root_scalar(second_derivative, x0=20, x1=25)
+# plt.show()
+#
+# """  test 2 """
+# x, radial1 = half_azimuthal_averaged_profile(cyc116.get_i_img()[0])
+# _, radial2 = half_azimuthal_averaged_profile(ND4.get_i_img()[0])
+# plt.show()
+#
+# """ Test 1 with ND4 """
+# scaling_factor2 = np.average(radial1[520:540] / radial2[520:540])
+# scaling_factor1 = np.average(radial1[484:504] / radial2[484:504])
+# print("scaling factor ND4: ", scaling_factor1)
+# print("scaling factor ND4: ", scaling_factor2)
+# scaling_func = lambda x, c: c * x
 #
 # plt.figure()
-# plt.plot(radial1[0, 15:80], first_der[15:80])
-#
-# print(zeros)
+# plt.title("Comparison 2 of ND4 to cyc116")
+# plt.semilogy(x, radial1, label="profile of cyc116")
+# plt.semilogy(x, (scaling_factor1 + scaling_factor2) * 0.5 * radial2, label="scaled profile of ND4")
+# plt.semilogy([-150, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], '--',
+#              label="max value of cyc116")
+# plt.ylim(ymin=1)
+# plt.legend()
 
 plt.show()

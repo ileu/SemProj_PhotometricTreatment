@@ -11,9 +11,9 @@ plt.rcParams["image.origin"] = 'lower'
 
 def start(star_data: StarImg):
     # Start parameters
-    ir0 = 26
-    mr0 = 50
-    or0 = 22
+    ir0 = 28
+    mr0 = 65
+    or0 = 31
     rinner = ir0
     rmiddle = mr0
     router = or0
@@ -44,7 +44,7 @@ def start(star_data: StarImg):
     diskmap, total_counts, bg_counts, bg_avgs = Star_Data.mark_disk(ir0, ir0 + mr0, ir0 + mr0 + or0)
     print(diskmap, total_counts, bg_counts, bg_avgs)
     ax.margins(x=350, y=350)
-    StarPlot = ax.imshow(diskmap, cmap='gray', vmin=-50, vmax=100)
+    StarPlot = ax.imshow(diskmap, cmap='viridis', vmin=-50, vmax=100)
 
     plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
 
