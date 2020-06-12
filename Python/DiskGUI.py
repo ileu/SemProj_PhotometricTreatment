@@ -43,7 +43,8 @@ def start(star_data: StarImg):
     Star_Data.calc_radial_polarization()
     diskmap, total_counts, bg_counts, bg_avgs = Star_Data.mark_disk(ir0, ir0 + mr0, ir0 + mr0 + or0)
     print(diskmap, total_counts, bg_counts, bg_avgs)
-    ax.margins(x=350, y=350)
+    ax.set_ylim((362, 662))
+    ax.set_xlim((362, 662))
     StarPlot = ax.imshow(diskmap, cmap='viridis', vmin=-50, vmax=100)
 
     plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)

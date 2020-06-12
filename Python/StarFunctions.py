@@ -3,11 +3,14 @@ from mpl_toolkits.mplot3d import Axes3D
 from typing import List
 from scipy.optimize import curve_fit, least_squares
 from scipy import interpolate
-from scipy.special import airy  # only use first output
 import numpy as np
 import mayavi.mlab as mlab
+import pickle
+import os
 
 plt.rcParams["image.origin"] = 'lower'
+full_file_path = os.getcwd()
+print(full_file_path)
 
 
 class OOI:
@@ -145,11 +148,27 @@ class StarImg:
         self.images = np.array([img_i, img_r])
         self.disk: OOI = None
         self.radial: np.array = []
-        self.azimutal = []
+        self.half_azimuthal = []
+        self.azimuthal = []
         self.objects: List[OOI] = []
         self.flux: List[float] = []
         self.wavelength: List[float] = []
         self.filter_reduction: List[float] = []
+
+    def save(self):
+        self.calc_radial_polarization()
+        for img in self.images:
+            self.azimuthal.append(azimuthal_averaged_profile(img.data[0]))
+            self.half_azimuthal.append(azimuthal_averaged_profile(img.data[0]))
+        save = [self.radial, self.azimuthal, self.half_azimuthal]
+
+        pickle.dump(save, open(full_file_path + "/../Data/" + self.name + "_save.p", "wb"))
+        print("File saved")
+
+    def load(self):
+        [self.radial, self.azimuthal, self.half_azimuthal] = pickle.load(
+            open(full_file_path + "/../Data/" + self.name + "_save.p", "rb"))
+        print("File loaded")
 
     def set_filter(self, i_filter, r_filter):
         self.filter_reduction = [i_filter, r_filter]
