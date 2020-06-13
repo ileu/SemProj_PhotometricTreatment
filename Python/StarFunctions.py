@@ -150,6 +150,7 @@ class StarImg:
         self.radial: np.array = []
         self.half_azimuthal = []
         self.azimuthal = []
+        self.azimuthal_qphi = []
         self.objects: List[OOI] = []
         self.flux: List[float] = []
         self.wavelength: List[float] = []
@@ -157,16 +158,18 @@ class StarImg:
 
     def save(self):
         self.calc_radial_polarization()
-        for img in self.images:
+        for index, img in enumerate(self.images):
             self.azimuthal.append(azimuthal_averaged_profile(img.data[0]))
             self.half_azimuthal.append(azimuthal_averaged_profile(img.data[0]))
-        save = [self.radial, self.azimuthal, self.half_azimuthal]
+            self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index, 0]))
+
+        save = [self.radial, self.azimuthal, self.half_azimuthal, self.azimuthal_qphi]
 
         pickle.dump(save, open(full_file_path + "/../Data/" + self.name + "_save.p", "wb"))
         print("File saved")
 
     def load(self):
-        [self.radial, self.azimuthal, self.half_azimuthal] = pickle.load(
+        [self.radial, self.azimuthal, self.half_azimuthal, self.azimuthal_qphi] = pickle.load(
             open(full_file_path + "/../Data/" + self.name + "_save.p", "rb"))
         print("File loaded")
 

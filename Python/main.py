@@ -137,68 +137,95 @@ for obj in gc.get_objects():
 
 # cyc116.calc_radial_polarization()
 
-DiskGUI.start(cyc116)
+# DiskGUI.start(cyc116)
 
 # cyc116_third_star.fitting_3d(cyc116.get_i_img()[0])
 
 plt.show()
 
-# """  test 1 """
-# x, radial1 = cyc116.azimuthal[1]
-# _, radial2 = ND4.azimuthal[1]
-#
-# _, psf = PointSpread.azimuthal[1]
-#
-# x2, qphi = azimuthal_averaged_profile(cyc116.radial[1, 0])
-#
-# plt.show()
-# """ Test 1 with ND4 """
-# first = 11
-# second = 38
-# scaling_factor1 = np.average(radial1[first:second] / radial2[first:second])
-# markers_on = [first, second]
-# print("scaling factor 1: ", scaling_factor1)
-# scaling_func = lambda x, a, b: a * (x - b)
-#
-# scaling_factor2 = curve_fit(scaling_func, radial2[first:second], radial1[first:second], p0=(8600, 1.15))
-# print("scaling factor 2", scaling_factor2)
-# print(np.median(radial2[100:]))
-#
-# plt.figure()
-# plt.title("Comparison 1 of ND4 to cyc116 manual")
-# plt.semilogy(x, radial1, '-D', label="profile of cyc116", markevery=markers_on)
-# plt.semilogy(x, 8598.452278589857 * (radial2 - 1.1421717), label="scaled profile of ND4")
-# psf_factor1 = 8598.452278589857 * (radial2[0] - 1.1421717) / psf[0]
-# plt.semilogy(x, psf_factor1 * psf, label="PSF profile")
-# plt.semilogy([0, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], '--',
-#              label="max value of cyc116")
-# plt.legend()
-# plt.ylim(ymin=1)
-#
-# plt.figure()
-# plt.title("Comparison 1 of ND4 to cyc116 wtih fit")
-# plt.semilogy(x, radial1, '-D', label="profile of cyc116", markevery=markers_on)
-# plt.semilogy(x, scaling_func(radial2, *scaling_factor2[0]), label="scaled profile of ND4")
-# psf_factor2 = scaling_func(radial2[0], *scaling_factor2[0]) / psf[0]
-# plt.semilogy(x, psf_factor2 * psf, label="PSF profile")
-# plt.semilogy([0, 150], [np.max(cyc116.get_i_img()[0]), np.max(cyc116.get_i_img()[0])], '--',
-#              label="max value of cyc116")
-# plt.ylim(ymin=1)
-#
-# plt.figure()
-# plt.title("manual removal")
-# plt.semilogy(x, radial1 - psf_factor1 * psf)
-# plt.ylim(ymin=1)
-#
-# plt.figure()
-# plt.title("Removal with fit")
-# plt.semilogy(x, radial1 - psf_factor2 * psf)
-# plt.ylim(ymin=1)
-#
-# plt.figure()
-# plt.title("Qphi profile")
-# plt.semilogy(x2, qphi)
-# plt.ylim(ymin=1)
+first = 11
+second = 38
+y_min = 0.1
+markers_on = [first, second]
+profile = ["I-band", "R-band"]
+
+
+def scaling_func(pos, a, b):
+    return a * (pos - b)
+
+
+for index in [0, 1]:
+    print(profile[index])
+    x, radial1 = cyc116.azimuthal[index]
+    _, radial2 = ND4.azimuthal[index]
+
+    _, psf = PointSpread.azimuthal[index]
+
+    x2, qphi = cyc116.azimuthal_qphi[index]
+
+    guess = (1.0 / ND4.filter_reduction[index], np.median(radial2[100:]))
+    print("guess: ", guess)
+    scaling_factor1 = np.average(radial1[first:second] / radial2[first:second])
+
+    scaling_factor2 = curve_fit(scaling_func, radial2[first:second], radial1[first:second], p0=guess)
+
+    print("scaling factor 1: ", scaling_factor1)
+    print("scaling factor 2", scaling_factor2)
+
+    fig = plt.figure(figsize=(28, 14))
+    textax = plt.axes([0.5, 0.95, 0.3, 0.03])
+    textax.axis('off')
+    textax.text(0, 0, "Comparison " + profile[index] + " of ND4 to cyc116", fontsize=18, ha='center')
+
+    ax = fig.add_subplot(1, 2, 1)
+    ax.set_title("manual")
+    ax.semilogy(x, radial1, '-D', label="profile of cyc116", markevery=markers_on)
+    ax.semilogy(x, guess[0] * (radial2 - guess[1]), label="scaled profile of ND4")
+    psf_factor1 = guess[0] * (radial2[0] - guess[1]) / psf[0]
+    ax.semilogy(x, psf_factor1 * psf, label="PSF profile")
+    ax.legend()
+    ax.set_ylim(ymin=y_min)
+
+    ax = fig.add_subplot(1, 2, 2)
+    ax.set_title("fit")
+    ax.semilogy(x, radial1, '-D', label="profile of cyc116", markevery=markers_on)
+    ax.semilogy(x, scaling_func(radial2, *scaling_factor2[0]), label="scaled profile of ND4")
+    psf_factor2 = scaling_func(radial2[0], *scaling_factor2[0]) / psf[0]
+    ax.semilogy(x, psf_factor2 * psf, label="PSF profile")
+    ax.legend()
+    ax.set_ylim(ymin=y_min)
+
+    fig.savefig("../Bilder/Comparison_" + profile[index] + ".png", dpi=300)
+
+    fig = plt.figure(figsize=(32, 14))
+    textax = plt.axes([0.5, 0.95, 0.3, 0.03])
+    textax.axis('off')
+    textax.text(0, 0, "Subtraction in " + profile[index], fontsize=18, ha='center')
+
+    ax = fig.add_subplot(1, 3, 1)
+    ax.set_title("manual")
+    ax.semilogy(x, radial1 - psf_factor1 * psf, )
+    ax.set_ylim(ymin=y_min)
+
+    ax = fig.add_subplot(1, 3, 2)
+    ax.set_title("fit")
+    ax.semilogy(x, radial1 - psf_factor2 * psf)
+    ax.set_ylim(ymin=y_min)
+
+    ax = fig.add_subplot(1, 3, 3)
+    ax.set_title("Qphi profile")
+    ax.semilogy(x2, qphi)
+    ax.set_ylim(ymin=y_min)
+
+    fig.savefig("../Bilder/Subtraction_" + profile[index] + ".png", dpi=300)
+
+    disk_profile1 = radial1 - psf_factor1 * psf
+    disk_profile2 = radial1 - psf_factor2 * psf
+    disk_profile1[disk_profile1 < 0] = 0
+    disk_profile2[disk_profile2 < 0] = 0
+
+    print("Counts manual: ", np.sum(disk_profile1[32:125]))
+    print("Counts fit: ", np.sum(disk_profile2[32:125]))
 
 # """  test 2 """
 # half_x, half_radial1 = half_azimuthal_averaged_profile(cyc116.get_i_img()[0])
