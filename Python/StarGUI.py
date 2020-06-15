@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.io import fits
 from matplotlib.widgets import Slider, Button, RadioButtons
-from StarFunctions import StarImg, OOI, ballestero
+from StarFunctions import StarImg
 
 plt.rcParams["image.origin"] = 'lower'
 

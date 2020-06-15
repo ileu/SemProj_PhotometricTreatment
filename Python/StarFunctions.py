@@ -243,8 +243,8 @@ class StarImg:
         background_pixel = np.count_nonzero(mask2)
 
         for img in radial_copy:
-            total_counts.append(np.sum(mask1 * img[0]))
-            background_avgs.append(np.sum(mask2 * img[0]) / background_pixel)
+            total_counts.append(np.sum(img[0, mask1]))
+            background_avgs.append(np.sum(img[0, mask2]) / background_pixel)
             wo_bg_counts.append(total_counts[-1] - background_avgs[-1] * obj_pixel)
 
         if band == "I":
@@ -310,20 +310,22 @@ class StarImg:
         return np.array(profile), fitting
 
 
-def azimuthal_averaged_profile(image: np.ndarray):
+def azimuthal_averaged_profile(image: np.ndarray, err=False):
     size = image[0].size
     radius = size // 2
     cx, cy = size // 2, size // 2
     x, y = np.arange(0, 2 * radius), np.arange(0, 2 * radius)
     img = image.copy()
     profile = []
+    error = []
     for r in range(0, radius):
         mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2
-        ring = img * mask
 
-        profile.append(np.average(ring[ring != 0]))
+        profile.append(np.average(img[mask]))
+        error.append(np.std(img[mask]) / np.sqrt(len(img[mask])))
 
-        img[mask] = 0
+    if err:
+        np.arange(0, radius), np.array(profile), np.array(error)
 
     return np.arange(0, radius), np.array(profile)
 
@@ -337,15 +339,13 @@ def half_azimuthal_averaged_profile(image: np.ndarray):
     neg_profile = []
     pos_profile = []
     for r in range(0, radius):
-        neg_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & (x[np.newaxis, :] < radius)
-        pos_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & (
-                x[np.newaxis, :] >= radius)
-        neg_half = img * neg_mask
-        pos_half = img * pos_mask
-        neg_profile.append(np.average(neg_half[neg_half != 0]))
-        pos_profile.append(np.average(pos_half[pos_half != 0]))
-        img[neg_mask] = 0
-        img[pos_mask] = 0
+        neg_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & \
+                   (x[np.newaxis, :] < radius)
+        pos_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & \
+                   (x[np.newaxis, :] >= radius)
+
+        neg_profile.append(np.average(img[neg_mask]))
+        pos_profile.append(np.average(img[pos_mask]))
 
     plt.show()
 
@@ -384,24 +384,16 @@ def moffat_2d(coord, x0, y0, alpha, beta, gamma, b):
     return alpha * (1 + ((x - x0) ** 2 + (y - y0) ** 2) / gamma) ** (-beta) + b
 
 
-def gauss(pos, a, sigma, mu, b):
-    return a * np.exp(-(pos - mu) ** 2 / (2 * sigma ** 2)) + b
-
-
-def ballestero(bv):
-    return 4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62))
-
-
 def angle_phi(x, y, x0, y0):
     size = len(y)
     out = np.zeros((size, size))
-    out[:, :size // 2] = -np.inf
-    out[:, size // 2 + 1:] = np.inf
-    results = np.true_divide(x - x0, y - y0, out=out, where=(x == x) & (y != size // 2))
+    out[:, :x0] = -np.inf
+    out[:, x0 + 1:] = np.inf
+    results = np.true_divide(x - x0, y - y0, out=out, where=(x == x) & (y != y0))
     return np.arctan(results)
 
 
-def aperture(pos_x, pos_y, inner_radius, outer_radius, img):
+def aperture(pos_x, pos_y, inner_radius, outer_radius, img, err=False):
     inner_radius = int(inner_radius)
     outer_radius = inner_radius + int(outer_radius)
     obj_count = 0
@@ -435,6 +427,15 @@ def aperture(pos_x, pos_y, inner_radius, outer_radius, img):
     obj_wo_background = obj_count - background_avg * obj_pixel
 
     return img_copy, obj_count, obj_wo_background, background_avg
+
+
+def annulus(img, radius, hole=0):
+    size = img[0].size
+    cx, cy = size // 2, size // 2
+    y, x = np.ogrid[:size, :size]
+    distance = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+    mask = (hole <= distance) & (distance <= radius)
+    return mask
 
 
 def diffraction_rings(profile: np.ndarray, estimate: int, width: int = 6):

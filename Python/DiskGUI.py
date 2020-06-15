@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.io import fits
 from matplotlib.widgets import Slider, Button, RadioButtons
-from StarFunctions import StarImg, OOI, ballestero
+from StarFunctions import StarImg
 
 plt.rcParams["image.origin"] = 'lower'
 
@@ -90,11 +89,10 @@ def start(star_data: StarImg):
         textaxis[6].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, 2.5 * np.log10(ratio)))
 
         StarPlot.set_data(new_plot)
-        print("draw")
+
         fig.canvas.draw()
 
     def change_band(label):
-        print("Click")
         nonlocal waveband
         if label == 'I\'-band':
             waveband = 'I'
