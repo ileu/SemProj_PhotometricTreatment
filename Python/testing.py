@@ -1,4 +1,3 @@
-from scipy.fftpack import fft
 import numpy as np
 import matplotlib.pyplot as plt
 from StarFunctions import annulus, angle_phi
