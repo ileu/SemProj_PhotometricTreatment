@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import numpy as np
 from scipy.optimize import curve_fit, root_scalar
 from StarData import cyc116, ND4, PointSpread
@@ -78,7 +79,7 @@ markers_on_psf = [peak, *tail]
 weights_nd4 = np.concatenate((np.full((21 - first,), 2), np.full((second - 21,), 1), np.full_like(tail, 1000)))
 weights_psf = np.concatenate((np.full((peak - first,), 3.5), np.full_like(tail, 1)))
 bounds_psf = ([0, -np.inf, 0], np.inf)
-save = True
+save = False
 smart = False
 mixed = True
 
@@ -93,22 +94,22 @@ if save:
 
 for index in [0, 1]:
     print(profile[index])
-    x, radial1 = cyc116.azimuthal[index]
-    _, radial2 = ND4.azimuthal[index]
+    x, cyc116_profile, cyc116_err = cyc116.azimuthal[index]
+    _, nd4_profile = ND4.azimuthal[index]
 
-    _, psf = PointSpread.azimuthal[index]
+    _, psf, psf_err = PointSpread.azimuthal[index]
 
-    x2, qphi = cyc116.azimuthal_qphi[index]
+    x2, qphi, qphi_err = cyc116.azimuthal_qphi[index]
 
-    guess = (1.0 / ND4.filter_reduction[index], np.median(radial2[100:]))
+    guess = (1.0 / ND4.filter_reduction[index], np.median(nd4_profile[100:]))
     print("guess: ", guess)
 
-    scaling_factor = curve_fit(scaling_func, radial2[nd4_region], radial1[nd4_region], p0=guess,
+    scaling_factor = curve_fit(scaling_func, nd4_profile[nd4_region], cyc116_profile[nd4_region], p0=guess,
                                sigma=weights_nd4)
 
-    scaled_profile = scaling_func(radial2, *scaling_factor[0])
+    scaled_profile = scaling_func(nd4_profile, *scaling_factor[0])
 
-    mixed_profile = radial1.copy()
+    mixed_profile = cyc116_profile.copy()
     mixed_profile[:80] = scaled_profile[:80]
     if mixed:
         scaled_profile = mixed_profile
@@ -117,7 +118,8 @@ for index in [0, 1]:
         name = "scaled profile of ND4"
 
     if smart:
-        tail = np.array((np.abs(scaled_profile[120:200] - radial1[120:200]) / radial1[120:200] <= 0.6827 / 2).nonzero()) \
+        tail = np.array((np.abs(scaled_profile[120:200] - cyc116_profile[120:200]) / cyc116_profile[
+                                                                                     120:200] <= 0.6827 / 2).nonzero()) \
                + 120
         print("Points satisfy condition: ", len(tail[0]))
         tail = tail[0, ::-len(tail[0]) // 8]
@@ -131,6 +133,8 @@ for index in [0, 1]:
 
     psf_profile = scaling_gauss_func(psf, *psf_factor[0])
 
+    disk_profile = cyc116_profile - psf_profile
+
     print("scaling factor", scaling_factor)
     print("psf factor", psf_factor)
 
@@ -139,16 +143,20 @@ for index in [0, 1]:
     textax.axis('off')
     textax.text(0, 0, "Comparison " + profile[index] + " of ND4 to cyc116", fontsize=18, ha='center')
     ax = fig_comp.add_subplot(1, 1, 1)
-    ax.semilogy(x, radial1, '-D', label="profile of cyc116", markevery=markers_on_nd4)
+    ax.semilogy(x, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
     ax.semilogy(x, scaled_profile, '-D', label=name, markevery=list(tail))
-    ax.semilogy(x, psf_profile, '-D', label="PSF profile", markevery=markers_on_psf)
+    nd4_equation = "${:.2f}\cdot(ND4-{:.2f})$".format(*scaling_factor[0])
+    ax.semilogy([], [], ' ', label=nd4_equation)
+    ax.semilogy(x, psf_profile, '-DC2', label="PSF profile", markevery=markers_on_psf)
+    psf_equation = "${:.2f}\cdot(gauss(PSF,{:.2f})-{:.2f})$".format(*psf_factor[0])
+    ax.semilogy([], [], ' ', label=psf_equation)
     ax.legend(fontsize='large')
     ax.set_ylim(ymin=y_min)
 
     zoom_xax = (5, 63)
 
     axins = ax.inset_axes([0.35, 0.55, 0.5, 0.43])
-    axins.semilogy(x, radial1, '-D', label="profile of cyc116", markevery=markers_on_nd4)
+    axins.semilogy(x, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
     axins.semilogy(x, scaled_profile, '-D', label=name, markevery=list(tail))
     axins.semilogy(x, psf_profile, '-D', label="PSF profile", markevery=markers_on_psf)
     axins.set_ylim(
@@ -162,13 +170,13 @@ for index in [0, 1]:
     textax.text(0, 0, "Subtraction in " + profile[index], fontsize=18, ha='center')
 
     ax = fig_sub.add_subplot(1, 1, 1)
-    line1, = ax.plot(x, radial1 - psf_profile, label="Reduced cyc116 profile")
+    line1, = ax.plot(x, disk_profile, label="Reduced cyc116 profile")
     ax1 = ax.twinx()
     line2, = ax1.plot(x2[20:], qphi[20:], "C3", label="Qphi profile")
     ax.tick_params(axis='y', labelcolor="C0")
     ax1.tick_params(axis='y', labelcolor="C3")
     ax1.set_ylim(ymin=-10, ymax=1.1 * max(qphi[20:]))
-    ax.set_ylim(ymin=-100, ymax=1.1 * max(radial1[20:] - psf_profile[20:]))
+    ax.set_ylim(ymin=-100, ymax=1.1 * max(disk_profile[20:]))
     line3 = ax.axhline(0, ls='--', c='k', alpha=0.5, label="zero")
     lines = [line1, line2, line3]
     align_yaxis(ax, 0, ax1, 0)
@@ -191,94 +199,94 @@ for index in [0, 1]:
         param_file.write("\nScaling factor: {}\n".format(scaling_factor[0]))
         param_file.write(("PSF factor: {}\n".format(psf_factor[0])))
 
-    disk_profile = radial1 - psf_profile
     disk_profile[disk_profile < 0] = 0
+    print("Median: ", np.median(disk_profile[130:]))
+    print("Counts fit: ", np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32))
+    print("Qphi counts: ", np.sum(qphi[24:118]))
+    print("PSF counts: ", np.sum(psf_profile[:22]) - np.median(cyc116_profile[130:]) * 22)
+    if save:
+        param_file.close()
 
-    print("Counts fit: ", np.sum(disk_profile[32:125]))
+    """ 2d attempt """
 
-if save:
-    param_file.close()
+    # first = 11
+    # second = 38
+    # y_min = 0.1
+    # markers_on = [first, second]
+    # profile = ["I-band", "R-band"]
+    # a = 1000
+    #
+    # for index in [0]:
+    #     print(profile[index])
+    #     map1 = cyc116.get_i_img()[index]
+    #     map2 = ND4.get_i_img()[index]
+    #     _, radial2 = ND4.azimuthal[index]
+    #     psf = PointSpread.get_i_img()[index]
+    #
+    #     qphi = cyc116.radial[index, 0]
+    #
+    #     region = annulus(map1, second, first)
+    #     outer_region = annulus(map1, np.inf, 200)
+    #     disk = annulus(map1, 125, 32)
+    #
+    #     guess = (1.0 / ND4.filter_reduction[index], np.median(radial2[100:]))
+    #     print("guess: ", guess)
+    #     max_cor = np.argmax(map2[region])
+    #     print("maximum location", max_cor)
+    #     print(map2[region].flatten()[max_cor])
+    #     psf_factor = guess[0] * (map2[region].flatten()[max_cor] - guess[1]) / psf[region].flatten()[max_cor]
+    #     print("psf factor:", psf_factor)
 
-""" 2d attempt """
+    # plt.figure()
+    # plt.semilogy(range(0, 1024), map1[512, :])
+    # plt.semilogy(range(0, 1024), guess[0] * (map2[512, :] - guess[1]))  # links rechts
+    # plt.semilogy(range(0, 1024), psf_factor * psf[512, :])
+    #
+    # plt.figure()
+    # plt.semilogy(range(0, 1024), map1[:, 512])
+    # plt.semilogy(range(0, 1024), guess[0] * (map2[:, 512] - guess[1]))  # oben unten
+    # plt.semilogy(range(0, 1024), psf_factor * psf[:, 512])
+    #
+    # plt.figure()
+    # plt.semilogy(range(0, 1024), map1[512, :] - psf_factor * psf[512, :])
+    #
+    # plt.figure()
+    # plt.semilogy(range(0, 1024), map1[:, 512] - psf_factor * psf[:, 512])
 
-# first = 11
-# second = 38
-# y_min = 0.1
-# markers_on = [first, second]
-# profile = ["I-band", "R-band"]
-# a = 1000
-#
-# for index in [0]:
-#     print(profile[index])
-#     map1 = cyc116.get_i_img()[index]
-#     map2 = ND4.get_i_img()[index]
-#     _, radial2 = ND4.azimuthal[index]
-#     psf = PointSpread.get_i_img()[index]
-#
-#     qphi = cyc116.radial[index, 0]
-#
-#     region = annulus(map1, second, first)
-#     outer_region = annulus(map1, np.inf, 200)
-#     disk = annulus(map1, 125, 32)
-#
-#     guess = (1.0 / ND4.filter_reduction[index], np.median(radial2[100:]))
-#     print("guess: ", guess)
-#     max_cor = np.argmax(map2[region])
-#     print("maximum location", max_cor)
-#     print(map2[region].flatten()[max_cor])
-#     psf_factor = guess[0] * (map2[region].flatten()[max_cor] - guess[1]) / psf[region].flatten()[max_cor]
-#     print("psf factor:", psf_factor)
+    # disk_map = map1 - psf_factor * psf
+    # disk_map[disk_map < 0] = 0
+    # print("Counts manual: ", np.sum(disk_map[disk]))
 
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[512, :])
-# plt.semilogy(range(0, 1024), guess[0] * (map2[512, :] - guess[1]))  # links rechts
-# plt.semilogy(range(0, 1024), psf_factor * psf[512, :])
-#
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[:, 512])
-# plt.semilogy(range(0, 1024), guess[0] * (map2[:, 512] - guess[1]))  # oben unten
-# plt.semilogy(range(0, 1024), psf_factor * psf[:, 512])
-#
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[512, :] - psf_factor * psf[512, :])
-#
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[:, 512] - psf_factor * psf[:, 512])
-
-# disk_map = map1 - psf_factor * psf
-# disk_map[disk_map < 0] = 0
-# print("Counts manual: ", np.sum(disk_map[disk]))
-
-# for obj in gc.get_objects():
-#     if isinstance(obj, StarImg):
-#         print(obj.name)
-#         x, radial = azimuthal_averaged_profile(obj.get_i_img()[0])
-#         # x, radial = half_azimuthal_averaged_profile(obj.get_i_img()[0])
-#         fig = plt.figure(num=obj.name)
-#         ax1 = fig.add_subplot(131)
-#         ax1.set_title("azimuthal rofile")
-#         ax1.semilogy(x, radial)
-#         ax2 = fig.add_subplot(132)
-#         ax2.set_title("first derivative")
-#         ax2.plot(x, np.gradient(radial))
-#         ax3 = fig.add_subplot(133)
-#         ax3.set_title("second derivative")
-#         sec = np.gradient(np.gradient(radial))
-#         sec_deriv_func = interpolate.interp1d(x, sec)
-#
-#
-#         def sec_deriv_sq(x):
-#             return sec_deriv_func(x) ** 2
-#
-#
-#         thin = np.linspace(x[0], x[-1], 10000)
-#         ax3.plot(thin, sec_deriv_sq(thin))
-#         results = diffraction_rings(radial, 19, width=10)
-#         print(np.array2string(results[0], precision=2))
-#         print(np.array2string(results[1], precision=2))
-#
-#         textax = plt.axes([0.5, 0.95, 0.3, 0.03])
-#         textax.axis('off')
-#         textax.text(0, 0, obj.name, fontsize=18, ha='center')
+    # for obj in gc.get_objects():
+    #     if isinstance(obj, StarImg):
+    #         print(obj.name)
+    #         x, radial = azimuthal_averaged_profile(obj.get_i_img()[0])
+    #         # x, radial = half_azimuthal_averaged_profile(obj.get_i_img()[0])
+    #         fig = plt.figure(num=obj.name)
+    #         ax1 = fig.add_subplot(131)
+    #         ax1.set_title("azimuthal rofile")
+    #         ax1.semilogy(x, radial)
+    #         ax2 = fig.add_subplot(132)
+    #         ax2.set_title("first derivative")
+    #         ax2.plot(x, np.gradient(radial))
+    #         ax3 = fig.add_subplot(133)
+    #         ax3.set_title("second derivative")
+    #         sec = np.gradient(np.gradient(radial))
+    #         sec_deriv_func = interpolate.interp1d(x, sec)
+    #
+    #
+    #         def sec_deriv_sq(x):
+    #             return sec_deriv_func(x) ** 2
+    #
+    #
+    #         thin = np.linspace(x[0], x[-1], 10000)
+    #         ax3.plot(thin, sec_deriv_sq(thin))
+    #         results = diffraction_rings(radial, 19, width=10)
+    #         print(np.array2string(results[0], precision=2))
+    #         print(np.array2string(results[1], precision=2))
+    #
+    #         textax = plt.axes([0.5, 0.95, 0.3, 0.03])
+    #         textax.axis('off')
+    #         textax.text(0, 0, obj.name, fontsize=18, ha='center')
 
 plt.show()

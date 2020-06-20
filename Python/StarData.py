@@ -18,20 +18,20 @@ ND4 = StarImg("ND4", ND4_1_data[0], ND4_2_data[0])
 
 ND4_filter_data = np.loadtxt("../Data/ND4_filter.txt", delimiter="\t", skiprows=1)
 
-HD142527_1_data = fits.open("../Data/sci_HD142527_norm_1.fits")
-HD142527_2_data = fits.open("../Data/sci_HD142527_norm_2.fits")
-
-HD142527 = StarImg("HD142527", HD142527_1_data[0], HD142527_2_data[0])
-
-HD163296_1_data = fits.open("../Data/sci_HD163296_R_I_fpnorm_1.fits")
-HD163296_2_data = fits.open("../Data/sci_HD163296_R_I_fpnorm_2.fits")
-
-HD163296 = StarImg("HD163296", HD163296_1_data[0], HD163296_2_data[0])
-
-HD169142_1_data = fits.open("../Data/sci_HD169142_Inorm_1.fits")
-HD169142_2_data = fits.open("../Data/sci_HD169142_Rnorm_2.fits")
-
-HD169142 = StarImg("HD169142", HD169142_1_data[0], HD169142_2_data[0])
+# HD142527_1_data = fits.open("../Data/sci_HD142527_norm_1.fits")
+# HD142527_2_data = fits.open("../Data/sci_HD142527_norm_2.fits")
+#
+# HD142527 = StarImg("HD142527", HD142527_1_data[0], HD142527_2_data[0])
+#
+# HD163296_1_data = fits.open("../Data/sci_HD163296_R_I_fpnorm_1.fits")
+# HD163296_2_data = fits.open("../Data/sci_HD163296_R_I_fpnorm_2.fits")
+#
+# HD163296 = StarImg("HD163296", HD163296_1_data[0], HD163296_2_data[0])
+#
+# HD169142_1_data = fits.open("../Data/sci_HD169142_Inorm_1.fits")
+# HD169142_2_data = fits.open("../Data/sci_HD169142_Rnorm_2.fits")
+#
+# HD169142 = StarImg("HD169142", HD169142_1_data[0], HD169142_2_data[0])
 
 Spread_1_data = fits.open("../Data/PSFiband.fits")
 Spread_2_data = fits.open("../Data/PSFrband.fits")
@@ -55,9 +55,9 @@ ND4_filter = interpolate.interp1d(ND4_filter_data[:, 0], ND4_filter_data[:, 3])
 
 cyc116.set_filter(1, 1)
 ND4.set_filter(ND4_filter(Iband_filter), ND4_filter(Rband_filter))
-HD142527.set_filter(1, 1)
-HD163296.set_filter(1, 1)
-HD169142.set_filter(1, 1)
+# HD142527.set_filter(1, 1)
+# HD163296.set_filter(1, 1)
+# HD169142.set_filter(1, 1)
 
 cyc116_second_star = OOI("Second star", 301, 307)
 cyc116_third_star = OOI("Third star", 298, 724)
@@ -86,30 +86,32 @@ cyc116.set_disk(cyc116_disk)
 # ND4.add_object(ND4_ghost2)
 ND4.add_object(ND4_main_star)
 
-HD142527_ghost1 = OOI("Ghost 1", 216, 386)
-HD142527_ghost2 = OOI("Ghost 2", 894, 599)
-HD142527_main_star = OOI("Main Star", 512, 512)
-
-HD142527.add_object(HD142527_ghost1)
-HD142527.add_object(HD142527_ghost2)
-HD142527.add_object(HD142527_main_star)
-
-HD163296_ghost1 = OOI("Ghost 1", 601, 515)
-HD163296_ghost2 = OOI("Ghost 2", 428, 506)
-HD163296_main_star = OOI("Main Star", 512, 512)
-
-HD163296.add_object(HD163296_ghost1)
-HD163296.add_object(HD163296_ghost2)
-HD163296.add_object(HD163296_main_star)
-
-HD169142_main_star = OOI("Main Star", 512, 512)
-
-HD169142.add_object(HD169142_main_star)
+# HD142527_ghost1 = OOI("Ghost 1", 216, 386)
+# HD142527_ghost2 = OOI("Ghost 2", 894, 599)
+# HD142527_main_star = OOI("Main Star", 512, 512)
+#
+# HD142527.add_object(HD142527_ghost1)
+# HD142527.add_object(HD142527_ghost2)
+# HD142527.add_object(HD142527_main_star)
+#
+# HD163296_ghost1 = OOI("Ghost 1", 601, 515)
+# HD163296_ghost2 = OOI("Ghost 2", 428, 506)
+# HD163296_main_star = OOI("Main Star", 512, 512)
+#
+# HD163296.add_object(HD163296_ghost1)
+# HD163296.add_object(HD163296_ghost2)
+# HD163296.add_object(HD163296_main_star)
+#
+# HD169142_main_star = OOI("Main Star", 512, 512)
+#
+# HD169142.add_object(HD169142_main_star)
 
 PointSpread_main_star = OOI("Main Star", 512, 512)
 
 PointSpread.add_object(PointSpread_main_star)
 """ save and calculate """
+
+ND4.save()
 
 # for obj in gc.get_objects():
 #     if isinstance(obj, StarImg):

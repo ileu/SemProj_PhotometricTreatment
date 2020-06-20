@@ -10,7 +10,6 @@ import os
 
 plt.rcParams["image.origin"] = 'lower'
 full_file_path = os.getcwd()
-print(full_file_path)
 
 
 class OOI:
@@ -160,7 +159,7 @@ class StarImg:
         self.calc_radial_polarization()
         for index, img in enumerate(self.images):
             self.azimuthal.append(azimuthal_averaged_profile(img.data[0]))
-            self.half_azimuthal.append(azimuthal_averaged_profile(img.data[0]))
+            self.half_azimuthal.append(half_azimuthal_averaged_profile(img.data[0]))
             self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index, 0]))
 
         save = [self.radial, self.azimuthal, self.half_azimuthal, self.azimuthal_qphi]
@@ -322,34 +321,42 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
         mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2
 
         profile.append(np.average(img[mask]))
-        error.append(np.std(img[mask]) / np.sqrt(len(img[mask])))
+        n = len(img[mask])
+        if n != 0:
+            error.append(np.std(img[mask]) / np.sqrt(len(img[mask])))
+        else:
+            error.append(0)
 
     if err:
-        np.arange(0, radius), np.array(profile), np.array(error)
+        return np.arange(0, radius), np.array(profile), np.array(error)
 
     return np.arange(0, radius), np.array(profile)
 
 
-def half_azimuthal_averaged_profile(image: np.ndarray):
+def half_azimuthal_averaged_profile(image: np.ndarray, err=False):
     size = image[0].size
     radius = size // 2
     cx, cy = size // 2, size // 2
     x, y = np.arange(0, 2 * radius), np.arange(0, 2 * radius)
     img = image.copy()
-    neg_profile = []
-    pos_profile = []
-    for r in range(0, radius):
+    profile = [img[radius, radius]]
+    error = []
+    for r in range(1, radius):
         neg_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & \
                    (x[np.newaxis, :] < radius)
         pos_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & \
                    (x[np.newaxis, :] >= radius)
 
-        neg_profile.append(np.average(img[neg_mask]))
-        pos_profile.append(np.average(img[pos_mask]))
+        profile.append(np.average(img[pos_mask]))
+        profile.insert(0, np.average(img[neg_mask]))
+        error.append(np.std(img[pos_mask]) / np.sqrt(len(img[pos_mask])))
+        error.insert(0, np.std(img[neg_mask]) / np.sqrt(len(img[neg_mask])))
 
     plt.show()
+    if err:
+        return np.arange(-radius, radius), np.array(profile), np.array(error)
 
-    return np.arange(-radius, radius), np.array([*neg_profile[::-1], *pos_profile])
+    return np.arange(-radius, radius), np.array(profile)
 
 
 def magnitude_wavelength_plot(fix_points, x):

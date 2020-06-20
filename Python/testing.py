@@ -26,7 +26,6 @@ def timing(f):
 
     return wrap
 
-
 size = 100
 min_size = 50
 legnth = 200
