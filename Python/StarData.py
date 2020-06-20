@@ -111,14 +111,11 @@ PointSpread_main_star = OOI("Main Star", 512, 512)
 PointSpread.add_object(PointSpread_main_star)
 """ save and calculate """
 
-ND4.save()
-
-# for obj in gc.get_objects():
-#     if isinstance(obj, StarImg):
-#         print(obj.name)
-#         obj.save()
+# cyc116.save()
+# ND4.save()
+# PointSpread.save()
 
 """ load data """
-for obj in gc.get_objects():
-    if isinstance(obj, StarImg):
-        obj.load()
+cyc116.load()
+ND4.load()
+PointSpread.load()

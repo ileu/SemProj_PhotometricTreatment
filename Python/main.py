@@ -1,12 +1,9 @@
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 import numpy as np
 from scipy.optimize import curve_fit, root_scalar
 from StarData import cyc116, ND4, PointSpread
 from datetime import datetime
 from scipy.ndimage import gaussian_filter1d
-from StarFunctions import azimuthal_averaged_profile, magnitude_wavelength_plot, diffraction_rings, \
-    half_azimuthal_averaged_profile, annulus
 import StarGUI
 import DiskGUI
 
@@ -15,7 +12,7 @@ import DiskGUI
 
 # cyc116.calc_radial_polarization()
 
-# DiskGUI.start(cyc116)
+DiskGUI.start(cyc116)
 
 # plt.show()
 
@@ -35,7 +32,7 @@ def mkdir_p(mypath):
 
     try:
         makedirs(mypath)
-    except OSError as exc:  # Python >2.5
+    except OSError as exc:
         if exc.errno == EEXIST and path.isdir(mypath):
             pass
         else:
@@ -82,6 +79,7 @@ bounds_psf = ([0, -np.inf, 0], np.inf)
 save = False
 smart = False
 mixed = True
+results = []
 
 profile = ["I-band", "R-band"]
 
@@ -95,7 +93,7 @@ if save:
 for index in [0, 1]:
     print(profile[index])
     x, cyc116_profile, cyc116_err = cyc116.azimuthal[index]
-    _, nd4_profile = ND4.azimuthal[index]
+    _, nd4_profile, nd4_err = ND4.azimuthal[index]
 
     _, psf, psf_err = PointSpread.azimuthal[index]
 
@@ -143,14 +141,16 @@ for index in [0, 1]:
     textax.axis('off')
     textax.text(0, 0, "Comparison " + profile[index] + " of ND4 to cyc116", fontsize=18, ha='center')
     ax = fig_comp.add_subplot(1, 1, 1)
-    ax.semilogy(x, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
-    ax.semilogy(x, scaled_profile, '-D', label=name, markevery=list(tail))
+    ax.plot(x, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
+    #  ax.fill_between(x, cyc116_profile + cyc116_err, cyc116_profile - cyc116_err, alpha=0.5, color='C0')
+    ax.plot(x, scaled_profile, '-D', label=name, markevery=list(tail))
     nd4_equation = "${:.2f}\cdot(ND4-{:.2f})$".format(*scaling_factor[0])
-    ax.semilogy([], [], ' ', label=nd4_equation)
-    ax.semilogy(x, psf_profile, '-DC2', label="PSF profile", markevery=markers_on_psf)
+    ax.plot([], [], ' ', label=nd4_equation)
+    ax.plot(x, psf_profile, '-DC2', label="PSF profile", markevery=markers_on_psf)
     psf_equation = "${:.2f}\cdot(gauss(PSF,{:.2f})-{:.2f})$".format(*psf_factor[0])
-    ax.semilogy([], [], ' ', label=psf_equation)
+    ax.plot([], [], ' ', label=psf_equation)
     ax.legend(fontsize='large')
+    ax.set_yscale('log', nonposy='clip')
     ax.set_ylim(ymin=y_min)
 
     zoom_xax = (5, 63)
@@ -200,7 +200,8 @@ for index in [0, 1]:
         param_file.write(("PSF factor: {}\n".format(psf_factor[0])))
 
     disk_profile[disk_profile < 0] = 0
-    print("Median: ", np.median(disk_profile[130:]))
+    results.append([np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32), np.sum(qphi[24:118]),
+                    np.sum(psf_profile[:22]) - np.median(cyc116_profile[130:]) * 22])
     print("Counts fit: ", np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32))
     print("Qphi counts: ", np.sum(qphi[24:118]))
     print("PSF counts: ", np.sum(psf_profile[:22]) - np.median(cyc116_profile[130:]) * 22)
@@ -289,4 +290,6 @@ for index in [0, 1]:
     #         textax.axis('off')
     #         textax.text(0, 0, obj.name, fontsize=18, ha='center')
 
+results = np.array(results)
+print("I/R: ", results[0] / results[1])
 plt.show()

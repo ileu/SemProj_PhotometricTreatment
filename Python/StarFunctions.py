@@ -156,11 +156,12 @@ class StarImg:
         self.filter_reduction: List[float] = []
 
     def save(self):
+        print(self.name)
         self.calc_radial_polarization()
         for index, img in enumerate(self.images):
-            self.azimuthal.append(azimuthal_averaged_profile(img.data[0]))
-            self.half_azimuthal.append(half_azimuthal_averaged_profile(img.data[0]))
-            self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index, 0]))
+            self.azimuthal.append(azimuthal_averaged_profile(img.data[0], err=True))
+            self.half_azimuthal.append(half_azimuthal_averaged_profile(img.data[0], err=True))
+            self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index, 0], err=True))
 
         save = [self.radial, self.azimuthal, self.half_azimuthal, self.azimuthal_qphi]
 
@@ -320,12 +321,14 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
     for r in range(0, radius):
         mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2
 
-        profile.append(np.average(img[mask]))
+        profile.append(np.nanmean(img[mask]))
         n = len(img[mask])
         if n != 0:
-            error.append(np.std(img[mask]) / np.sqrt(len(img[mask])))
+            error.append(np.sqrt(np.nansum(img[mask])) / len(img[mask]))
         else:
             error.append(0)
+
+        img[mask] = np.nan
 
     if err:
         return np.arange(0, radius), np.array(profile), np.array(error)
@@ -333,6 +336,7 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
     return np.arange(0, radius), np.array(profile)
 
 
+# todo fix this shit below
 def half_azimuthal_averaged_profile(image: np.ndarray, err=False):
     size = image[0].size
     radius = size // 2
