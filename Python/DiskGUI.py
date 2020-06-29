@@ -22,9 +22,6 @@ def start(star_data: StarImg):
 
     fig, ax = plt.subplots(figsize=(18, 11))
 
-    Star_Data: StarImg = None
-    StarPlot = None
-
     axinner = plt.axes([0.58, 0.85, 0.35, 0.03], facecolor=axcolor)
     axmiddle = plt.axes([0.58, 0.8, 0.35, 0.03], facecolor=axcolor)
     axouter = plt.axes([0.58, 0.75, 0.35, 0.03], facecolor=axcolor)
@@ -40,8 +37,8 @@ def start(star_data: StarImg):
 
     Star_Data = star_data
     Star_Data.calc_radial_polarization()
-    diskmap, total_counts, bg_counts, bg_avgs = Star_Data.mark_disk(ir0, ir0 + mr0, ir0 + mr0 + or0)
-    print(diskmap, total_counts, bg_counts, bg_avgs)
+    diskmap, total_counts, bg_counts, bg_avgs, err = Star_Data.mark_disk(ir0, ir0 + mr0, ir0 + mr0 + or0, err=True)
+    print(err)
     ax.set_ylim((362, 662))
     ax.set_xlim((362, 662))
     StarPlot = ax.imshow(diskmap, cmap='viridis', vmin=-50, vmax=100)
@@ -57,6 +54,11 @@ def start(star_data: StarImg):
     textax = plt.axes([0.58, 0.5, 0.3, 0.03])
     textax.axis('off')
     ratio = bg_counts[0] / bg_counts[1]
+    ratio_err = (err[0, 1] / bg_counts[1]) ** 2
+    ratio_err += (err[1, 1] * bg_counts[0] / bg_counts[1] ** 2) ** 2
+    ratio_err = np.sqrt(ratio_err)
+
+    print(ratio_err)
     textaxis = [textax.text(0, 0, "Disk", fontsize=14, fontweight='bold', color='blue'),
                 textax.text(0, -1, "                     I'-band   R'-band"),
                 textax.text(0, -2, "Total Count:  {:.0f}   {:.0f}".format(*total_counts)),
@@ -79,9 +81,16 @@ def start(star_data: StarImg):
         rmiddle = smiddle.val
         router = souter.val
 
-        new_plot, total_counts, bg_counts, bg_avgs = Star_Data.mark_disk(rinner, rinner + rmiddle,
-                                                                         rinner + rmiddle + router, band=waveband)
+        new_plot, total_counts, bg_counts, bg_avgs, err = Star_Data.mark_disk(rinner, rinner + rmiddle,
+                                                                              rinner + rmiddle + router, band=waveband,
+                                                                              err=True)
+        print(err)
         ratio = bg_counts[0] / bg_counts[1]
+        ratio_err = (err[0, 1] / bg_counts[1]) ** 2
+        ratio_err += (err[1, 1] * bg_counts[0] / bg_counts[1] ** 2) ** 2
+        ratio_err = np.sqrt(ratio_err)
+
+        print(ratio_err)
         textaxis[2].set_text("Total Count:  {:.0f}   {:.0f}".format(*total_counts))
         textaxis[3].set_text("Average BG:  {:.0f}   {:.0f}".format(*bg_avgs))
         textaxis[4].set_text("Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts))

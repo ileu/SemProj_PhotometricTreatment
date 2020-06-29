@@ -6,24 +6,23 @@ from StarFunctions import StarImg
 plt.rcParams["image.origin"] = 'lower'
 
 
-# functions
-
 def start(star_data: StarImg):
     # Start parameters
-    ir0 = 16  # maybe 21
+    ir0 = 16
     or0 = 12
     rinner = ir0
     router = or0
+    a = 1e-2
     pixel = 1.0
-    waveband = 'I'
     axcolor = 'lavender'
 
     textaxes = []
 
-    fig, ax = plt.subplots(figsize=(18, 11))
+    star_map = star_data.get_i_img()[0]
+    star_map = np.log10(a * star_map + 1)
+    obj_names = [obj.name for obj in star_data.objects]
 
-    Star_Data: StarImg = None
-    StarPlot = None
+    fig, ax = plt.subplots(figsize=(18, 11))
 
     axinner = plt.axes([0.58, 0.85, 0.35, 0.03], facecolor=axcolor)
     axouter = plt.axes([0.58, 0.8, 0.35, 0.03], facecolor=axcolor)
@@ -34,77 +33,82 @@ def start(star_data: StarImg):
     rax = plt.axes([0.58, 0.65, 0.1, 0.1], facecolor=axcolor)
     rax.set_title("Select wave band:")
     radio = RadioButtons(rax, ('I\'-band', 'R\'-band'), active=0)
-    # GUI setup
-
-    Star_Data = star_data
-
-    starmap = Star_Data.mark_objects(ir0, or0)
-
-    StarPlot = ax.imshow(starmap)
-
-    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
-
     for circle in radio.circles:
         circle.set_radius(0.07)
 
     resetax = plt.axes([0.85, 0.11, 0.08, 0.04])
     button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
 
-    for index, obj in enumerate(Star_Data.objects):
+    # GUI setup
+
+    star_plot = ax.imshow(star_map, cmap='gray')
+    star_mask_plot = ax.imshow(star_map, cmap='gray')
+
+    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
+
+    for index, name in enumerate(obj_names):
         textax = plt.axes([0.65 - 0.1 * (-1) ** index, 0.62 - 0.21 * np.floor(index / 2), 0.3, 0.03])
         textax.axis('off')
-        obj.count = [ir0, or0]
-        total_counts, bg_counts, bg_avgs = obj.count_pixel(Star_Data, filter_val=Star_Data.filter_reduction)
-        ratio = bg_counts[0] / bg_counts[1]
-        magnitude = 2.5 * np.log10(ratio)
-        textaxis = [textax.text(0, 0, obj.name, fontsize=14, fontweight='bold', color='blue'),
+        textaxis = [textax.text(0, 0, name, fontsize=14, fontweight='bold', color='blue'),
                     textax.text(0, -1, "                     I'-band   R'-band"),
-                    textax.text(0, -2, "Total Count:  {:.0f}   {:.0f}".format(*total_counts)),
-                    textax.text(0, -3, "Average BG:  {:.0f}   {:.0f}".format(*bg_avgs)),
-                    textax.text(0, -4, "Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts)),
-                    textax.text(0, -5, "Relativ reduction:  {:.4f}   {:.4f}".format(*(bg_counts / total_counts))),
-                    textax.text(0, -6, "Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, magnitude))]
+                    textax.text(0, -2, "S"),
+                    textax.text(0, -3, "T"),
+                    textax.text(0, -4, "A"),
+                    textax.text(0, -5, "R")]
         textaxes.append(textaxis)
 
     # interaction function
-
-    def update_count():
-        for text, obj in zip(textaxes, Star_Data.objects):
-            total_counts, bg_counts, bg_avgs = obj.count_pixel(Star_Data, filter_val=Star_Data.filter_reduction)
-            ratio = bg_counts[0] / bg_counts[1]
-            text[2].set_text("Total Count:  {:.0f}   {:.0f}".format(*total_counts))
-            text[3].set_text("Average BG:  {:.0f}   {:.0f}".format(*bg_avgs))
-            text[4].set_text("Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts))
-            text[5].set_text("Relativ reduction:  {:.4f}   {:.4f}".format(*(bg_counts / total_counts))),
-            text[6].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, 2.5 * np.log10(ratio)))
 
     def reset(event):
         sinner.reset()
         souter.reset()
         fig.canvas.draw_idle()
 
-    def update(val):
+    def update(val=None):
         nonlocal rinner, router
         rinner = sinner.val
         router = souter.val
 
-        StarPlot.set_data(Star_Data.mark_objects(rinner, router, band=waveband))
-        update_count()
+        star_mask, total_counts, bg_counts, bg_avgs, err = star_data.mark_objects(rinner, router, err=True)
+
+        for index, text in enumerate(textaxes):
+            # print(obj.name)
+            # print(err)
+            ratio = bg_counts[index][0] / bg_counts[index][1]
+            ratio_err = (err[index][0] / bg_counts[index][1]) ** 2
+            ratio_err += (err[index][1] * bg_counts[index][0] / bg_counts[index][1] ** 2) ** 2
+            ratio_err = np.sqrt(ratio_err)
+
+            if ratio > 0:
+                magnitude = 2.5 * np.log10(ratio)
+            else:
+                magnitude = np.nan
+
+            # print(ratio_err)
+            text[2].set_text("Total Count:  {:.0f}   {:.0f}".format(*total_counts[index]))
+            text[3].set_text("Average BG:  {:.0f}   {:.0f}".format(*bg_avgs[index]))
+            text[4].set_text("Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts[index]))
+            text[5].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, magnitude))
+
+        star_mask_plot.set_data(star_mask)
 
         fig.canvas.draw()
 
     def change_band(label):
+        nonlocal star_map
         # print("Click")
         if label == 'I\'-band':
-            band = 'I'
-            StarPlot.set_data(Star_Data.mark_objects(rinner, router, band=band))
+            star_map = star_data.get_i_img()[0]
         elif label == 'R\'-band':
-            band = 'R'
-            StarPlot.set_data(Star_Data.mark_objects(rinner, router, band=band))
+            star_map = star_data.get_r_img()[0]
         else:
             raise ValueError("How is this even possible...")
 
+        star_map = np.log10(a * star_map + 1)
+        star_plot.set_data(star_map)
         fig.canvas.draw_idle()
+
+    update()
 
     sinner.on_changed(update)
     souter.on_changed(update)

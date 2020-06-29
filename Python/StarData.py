@@ -1,6 +1,5 @@
 from astropy.io import fits
 from StarFunctions import StarImg, OOI
-import gc
 import numpy as np
 from scipy import interpolate
 
@@ -109,13 +108,13 @@ ND4.add_object(ND4_main_star)
 PointSpread_main_star = OOI("Main Star", 512, 512)
 
 PointSpread.add_object(PointSpread_main_star)
-""" save and calculate """
+""" calculates & saves """
 
 # cyc116.save()
 # ND4.save()
 # PointSpread.save()
 
-""" load data """
+""" loads data """
 cyc116.load()
 ND4.load()
 PointSpread.load()

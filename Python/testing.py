@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from StarFunctions import annulus, angle_phi
+from StarFunctions import aperture, angle_phi
 import time
 
 
@@ -26,11 +26,25 @@ def timing(f):
 
     return wrap
 
+
+size = 150
+x, y = np.meshgrid(range(0, size), range(0, size))
+
+distance = np.sqrt((x - size // 2) ** 2 + (y - size // 2) ** 2)
+mask1 = np.where((0 <= distance) & (distance < 25), 0.5, 1)
+mask2 = np.where((25 <= distance) & (distance < 50), 0, 1)
+
+plt.imshow(mask1 + mask2, cmap='Set1')
+plt.show()
+
+
+
+"""
 size = 100
 min_size = 50
 legnth = 200
 img = np.full((legnth, legnth), 5)
-x, y = np.meshgrid(range(0, legnth), range(0, legnth))
+
 test = annulus(img, np.inf, min_size)
 angles = angle_phi(x, y, size, size)
 distance = np.sqrt((x - size) ** 2 + (y - size) ** 2)
@@ -56,3 +70,4 @@ for space in spacing:
     plt.figure()
     plt.imshow(mask)
 plt.show()
+"""
