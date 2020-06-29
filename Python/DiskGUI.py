@@ -17,9 +17,11 @@ def start(star_data: StarImg):
     rmiddle = mr0
     router = or0
     pixel = 1.0
-    waveband = 'I'
     axcolor = 'lavender'
 
+    disk_map = star_data.radial[0][0]
+
+    # GUI setup
     fig, ax = plt.subplots(figsize=(18, 11))
 
     axinner = plt.axes([0.58, 0.85, 0.35, 0.03], facecolor=axcolor)
@@ -33,18 +35,6 @@ def start(star_data: StarImg):
     rax = plt.axes([0.58, 0.60, 0.1, 0.1], facecolor=axcolor)
     rax.set_title("Select wave band:")
     radio = RadioButtons(rax, ('I\'-band', 'R\'-band'), active=0)
-    # GUI setup
-
-    Star_Data = star_data
-    Star_Data.calc_radial_polarization()
-    diskmap, total_counts, bg_counts, bg_avgs, err = Star_Data.mark_disk(ir0, ir0 + mr0, ir0 + mr0 + or0, err=True)
-    print(err)
-    ax.set_ylim((362, 662))
-    ax.set_xlim((362, 662))
-    StarPlot = ax.imshow(diskmap, cmap='viridis', vmin=-50, vmax=100)
-
-    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
-
     for circle in radio.circles:
         circle.set_radius(0.07)
 
@@ -53,19 +43,23 @@ def start(star_data: StarImg):
 
     textax = plt.axes([0.58, 0.5, 0.3, 0.03])
     textax.axis('off')
-    ratio = bg_counts[0] / bg_counts[1]
-    ratio_err = (err[0, 1] / bg_counts[1]) ** 2
-    ratio_err += (err[1, 1] * bg_counts[0] / bg_counts[1] ** 2) ** 2
-    ratio_err = np.sqrt(ratio_err)
 
-    print(ratio_err)
     textaxis = [textax.text(0, 0, "Disk", fontsize=14, fontweight='bold', color='blue'),
                 textax.text(0, -1, "                     I'-band   R'-band"),
-                textax.text(0, -2, "Total Count:  {:.0f}   {:.0f}".format(*total_counts)),
-                textax.text(0, -3, "Average BG:  {:.0f}   {:.0f}".format(*bg_avgs)),
-                textax.text(0, -4, "Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts)),
-                textax.text(0, -5, "Relativ reduction:  {:.4f}   {:.4f}".format(*(bg_counts / total_counts))),
-                textax.text(0, -6, "Ratio I/R:  {:.4f}  ".format(ratio))]
+                textax.text(0, -2, "D"),
+                textax.text(0, -3, "I"),
+                textax.text(0, -4, "S"),
+                textax.text(0, -5, "K")]
+
+    # Plotting
+
+    ax.set_ylim((362, 662))
+    ax.set_xlim((362, 662))
+
+    disk_plot = ax.imshow(disk_map, cmap='gray', vmin=-50, vmax=100)
+    disk_mask_plot = ax.imshow(disk_map, cmap='gray', vmin=-50, vmax=100)
+
+    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
 
     # interaction function
 
@@ -75,44 +69,43 @@ def start(star_data: StarImg):
         souter.reset()
         fig.canvas.draw_idle()
 
-    def update(val):
-        nonlocal rinner, rmiddle, router, waveband
+    def update(val=None):
+        nonlocal rinner, rmiddle, router
         rinner = sinner.val
         rmiddle = smiddle.val
         router = souter.val
 
-        new_plot, total_counts, bg_counts, bg_avgs, err = Star_Data.mark_disk(rinner, rinner + rmiddle,
-                                                                              rinner + rmiddle + router, band=waveband,
-                                                                              err=True)
-        print(err)
-        ratio = bg_counts[0] / bg_counts[1]
-        ratio_err = (err[0, 1] / bg_counts[1]) ** 2
-        ratio_err += (err[1, 1] * bg_counts[0] / bg_counts[1] ** 2) ** 2
-        ratio_err = np.sqrt(ratio_err)
+        disk_mask, total_counts, bg_counts, bg_avgs = star_data.mark_disk(rinner, rinner + rmiddle,
+                                                                          rinner + rmiddle + router)
 
-        print(ratio_err)
+        ratio = bg_counts[0] / bg_counts[1]
+
+        if ratio > 0:
+            magnitude = 2.5 * np.log10(ratio)
+        else:
+            magnitude = np.nan
+
         textaxis[2].set_text("Total Count:  {:.0f}   {:.0f}".format(*total_counts))
         textaxis[3].set_text("Average BG:  {:.0f}   {:.0f}".format(*bg_avgs))
         textaxis[4].set_text("Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts))
-        textaxis[5].set_text("Relativ reduction:  {:.4f}   {:.4f}".format(*(bg_counts / total_counts))),
-        textaxis[6].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, 2.5 * np.log10(ratio)))
+        textaxis[5].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, 2.5 * np.log10(ratio)))
 
-        StarPlot.set_data(new_plot)
+        disk_mask_plot.set_data(disk_mask)
 
         fig.canvas.draw()
 
     def change_band(label):
-        nonlocal waveband
+        nonlocal disk_map
         if label == 'I\'-band':
-            waveband = 'I'
-            update(None)
+            disk_map = star_data.radial[0][0]
         elif label == 'R\'-band':
-            waveband = 'R'
-            update(None)
+            disk_map = star_data.radial[1][0]
         else:
             raise ValueError("How is this even possible...")
-
+        disk_plot.set_data(disk_map)
         fig.canvas.draw_idle()
+
+    update()
 
     sinner.on_changed(update)
     smiddle.on_changed(update)

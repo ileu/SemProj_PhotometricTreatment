@@ -186,63 +186,42 @@ class StarImg:
 
         return self.objects
 
-    def mark_disk(self, inner_radius, middle_radius, outer_radius, band='I', err=False):
+    def mark_disk(self, inner_radius, middle_radius, outer_radius, alpha=0.125):
+
         if self.disk is None:
             raise ValueError("Please assign a disk first")
 
-        total_counts = []
-        wo_bg_counts = []
-        background_avgs = []
-        error = []
+        radial_i = self.radial[0][0].copy()
+        radial_r = self.radial[1][0].copy()
 
-        radial_copy: np.ndarray = self.radial.copy()
-        frame, phi, h, w = self.radial.shape
+        shape = radial_i.shape
+        cmap = plt.cm.get_cmap('Set1_r')
 
-        y, x = np.ogrid[:h, :w]
-        radius = np.sqrt((x - self.disk.pos_x) ** 2 + (y - self.disk.pos_y) ** 2)
-        radius = np.array(radius)
+        mask1 = aperture(shape, *self.disk.get_pos(False), middle_radius, inner_radius)
+        obj_pixel = np.sum(mask1)
 
-        mask1 = (inner_radius <= radius) & (radius <= middle_radius)
-        obj_pixel = np.count_nonzero(mask1)
+        mask2 = aperture(shape, *self.disk.get_pos(False), outer_radius, middle_radius)
 
-        mask2 = (middle_radius < radius) & (radius <= outer_radius)
-        background_pixel = np.count_nonzero(mask2)
+        total_counts = [np.sum(radial_i[mask1]), np.sum(radial_r[mask1])]
+        background_avgs = [np.mean(radial_i[mask2]), np.mean(radial_r[mask2])]
+        wo_bg_counts = [total_counts[0] - background_avgs[0] * obj_pixel,
+                        total_counts[1] - background_avgs[1] * obj_pixel]
 
-        for img in radial_copy:
-            total_counts.append(np.sum(img[0, mask1]))
-            background_avgs.append(np.sum(img[0, mask2]) / background_pixel)
-            wo_bg_counts.append(total_counts[-1] - background_avgs[-1] * obj_pixel)
-            if err:
-                error.append([np.sqrt(total_counts[-1]),
-                              np.sqrt(total_counts[-1] + (np.std(img[0, mask2]) / background_pixel * obj_pixel) ** 2)])
+        mask = 0.5 * mask1 + mask2
+        alphas = alpha * (mask1 + mask2)
 
-        if band == "I":
-            radial_copy[0, 0][mask1] *= 3
-            radial_copy[0, 0][mask2] *= 5
-            if err:
-                return np.array(radial_copy[0, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
-                    background_avgs), np.array(error)
-            return np.array(radial_copy[0, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
-                background_avgs)
+        mask = cmap(mask)
+        mask[..., -1] = alphas
 
-        elif band == "R":
-            radial_copy[1, 0][mask1] *= 3
-            radial_copy[1, 0][mask2] *= 5
-            if err:
-                return np.array(radial_copy[1, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
-                    background_avgs), np.array(error)
-            return np.array(radial_copy[1, 0]), np.array(total_counts), np.array(wo_bg_counts), np.array(
-                background_avgs)
-        else:
-            raise ValueError("ABORT wrong input")
+        return mask, np.array(total_counts), np.array(wo_bg_counts), np.array(background_avgs)
 
-    def mark_objects(self, inner_radius, outer_radius, err=False, alpha=0.5):
+    def mark_objects(self, inner_radius, outer_radius, err=False, alpha=0.125):
         img_i = self.images[0].data[0, :, :].copy()
         img_r = self.images[1].data[0, :, :].copy()
 
         shape = img_i.shape
-
         cmap = plt.cm.get_cmap('Set1_r')
+
         total_counts = []
         wo_bg_counts = []
         background_avgs = []
@@ -253,7 +232,7 @@ class StarImg:
 
         for obj in self.objects:
             mask_in = aperture(shape, *obj.get_pos(False), inner_radius)
-            mask_out = aperture(shape, *obj.get_pos(False), inner_radius + outer_radius, inner_radius)
+            mask_out = aperture(shape, *obj.get_pos(False), outer_radius, inner_radius)
 
             total_counts.append([np.sum(img_i[mask_in]), np.sum(img_r[mask_in])])
             background_avgs.append([np.mean(img_i[mask_out]), np.mean(img_r[mask_out])])
@@ -311,9 +290,9 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
         mask = aperture(shape, size // 2, size // 2, r)
 
         profile.append(np.nanmean(img[mask]))
-        n = len(img[mask])
+        n = np.nansum(mask)
         if n != 0:
-            error.append(np.sqrt(np.nansum(img[mask])) / len(img[mask]))
+            error.append(np.sqrt(np.nansum(img[mask])) / n)
         else:
             error.append(0)
 

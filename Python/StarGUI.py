@@ -22,6 +22,8 @@ def start(star_data: StarImg):
     star_map = np.log10(a * star_map + 1)
     obj_names = [obj.name for obj in star_data.objects]
 
+    # GUI setup
+
     fig, ax = plt.subplots(figsize=(18, 11))
 
     axinner = plt.axes([0.58, 0.85, 0.35, 0.03], facecolor=axcolor)
@@ -39,13 +41,6 @@ def start(star_data: StarImg):
     resetax = plt.axes([0.85, 0.11, 0.08, 0.04])
     button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
 
-    # GUI setup
-
-    star_plot = ax.imshow(star_map, cmap='gray')
-    star_mask_plot = ax.imshow(star_map, cmap='gray')
-
-    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
-
     for index, name in enumerate(obj_names):
         textax = plt.axes([0.65 - 0.1 * (-1) ** index, 0.62 - 0.21 * np.floor(index / 2), 0.3, 0.03])
         textax.axis('off')
@@ -56,6 +51,12 @@ def start(star_data: StarImg):
                     textax.text(0, -4, "A"),
                     textax.text(0, -5, "R")]
         textaxes.append(textaxis)
+
+    # Plotting
+    star_plot = ax.imshow(star_map, cmap='gray')
+    star_mask_plot = ax.imshow(star_map, cmap='gray')
+
+    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
 
     # interaction function
 
@@ -69,15 +70,15 @@ def start(star_data: StarImg):
         rinner = sinner.val
         router = souter.val
 
-        star_mask, total_counts, bg_counts, bg_avgs, err = star_data.mark_objects(rinner, router, err=True)
+        star_mask, total_counts, bg_counts, bg_avgs = star_data.mark_objects(rinner, rinner + router)
 
         for index, text in enumerate(textaxes):
             # print(obj.name)
             # print(err)
             ratio = bg_counts[index][0] / bg_counts[index][1]
-            ratio_err = (err[index][0] / bg_counts[index][1]) ** 2
-            ratio_err += (err[index][1] * bg_counts[index][0] / bg_counts[index][1] ** 2) ** 2
-            ratio_err = np.sqrt(ratio_err)
+            # ratio_err = (err[index][0] / bg_counts[index][1]) ** 2
+            # ratio_err += (err[index][1] * bg_counts[index][0] / bg_counts[index][1] ** 2) ** 2
+            # ratio_err = np.sqrt(ratio_err)
 
             if ratio > 0:
                 magnitude = 2.5 * np.log10(ratio)

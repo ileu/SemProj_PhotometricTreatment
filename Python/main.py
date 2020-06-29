@@ -10,7 +10,7 @@ import DiskGUI
 
 StarGUI.start(cyc116)
 
-# DiskGUI.start(cyc116)
+DiskGUI.start(cyc116)
 
 
 def scaling_func(pos, a, b):
