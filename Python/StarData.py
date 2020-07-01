@@ -110,9 +110,9 @@ PointSpread_main_star = OOI("Main Star", 512, 512)
 PointSpread.add_object(PointSpread_main_star)
 """ calculates & saves """
 
-# cyc116.save()
-# ND4.save()
-# PointSpread.save()
+cyc116.save()
+ND4.save()
+PointSpread.save()
 
 """ loads data """
 cyc116.load()

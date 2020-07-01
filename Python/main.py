@@ -6,11 +6,13 @@ from datetime import datetime
 from scipy.ndimage import gaussian_filter1d
 import StarGUI
 import DiskGUI
+from StarFunctions import aperture
+from StarData import cyc116_second_star, cyc116_ghost2
 
+test = cyc116.get_i_img()[0]
 
-StarGUI.start(cyc116)
-
-DiskGUI.start(cyc116)
+print(cyc116_second_star.fitting_3d(20, 39, test))
+print(cyc116_ghost2.fitting_3d(20, 39, test))
 
 
 def scaling_func(pos, a, b):
@@ -59,19 +61,29 @@ def adjust_yaxis(ax, ydif, v):
     ax.set_ylim(nminy + v, nmaxy + v)
 
 
-plt.figure(figsize=(8, 8))
-plt.imshow(cyc116.radial[0, 0], vmin=-50, vmax=110, cmap='gray')
-plt.ylim((400, 624))
-plt.xlim((400, 624))
-plt.yticks(np.linspace(0, 1, 5) * 224 + 400, fontsize=18)
-plt.xticks(np.linspace(0, 1, 5) * 224 + 400, fontsize=18)
+""" GUI """
 
-plt.figure(figsize=(8, 8))
-plt.imshow(np.log10(1e-2 * cyc116.get_i_img()[0] + 1), cmap='gray')
-plt.yticks(fontsize=18)
-plt.xticks(fontsize=18)
+# StarGUI.start(cyc116)
+#
+# DiskGUI.start(cyc116)
 
-plt.show()
+""" Plots """
+
+# plt.figure(figsize=(8, 8))
+# plt.imshow(cyc116.radial[0, 0], vmin=-50, vmax=110, cmap='gray')
+# plt.ylim((362, 662))
+# plt.xlim((362, 662))
+# plt.yticks(fontsize=18)
+# plt.xticks(fontsize=18)
+#
+# plt.figure(figsize=(8, 8))
+# plt.imshow(np.log10(1e-2 * cyc116.get_i_img()[0] + 1), cmap='gray')
+# plt.yticks(fontsize=18)
+# plt.xticks(fontsize=18)
+#
+# plt.show()
+
+""" Fits """
 
 first = 14
 second = 65
@@ -93,6 +105,9 @@ mixed = True
 results = []
 results_err = []
 
+scal_profiles = []
+star_profiles = []
+
 profile = ["I-band", "R-band"]
 
 if save:
@@ -108,7 +123,7 @@ for index in [0, 1]:
     x, cyc116_profile, cyc116_err = cyc116.azimuthal[index]
     _, nd4_profile, nd4_err = ND4.azimuthal[index]
 
-    _, psf, psf_err = PointSpread.azimuthal[index]
+    _, psf_profile, psf_err = PointSpread.azimuthal[index]
 
     x2, qphi, qphi_err = cyc116.azimuthal_qphi[index]
 
@@ -120,6 +135,7 @@ for index in [0, 1]:
     print("scaling factor", scaling_factor)
 
     scaled_profile = scaling_func(nd4_profile, *scaling_factor[0])
+    scal_profiles.append(scaled_profile)
 
     scaled_profile_err = scaling_factor[0][0] ** 2 * scaling_factor[1][1, 1]
     scaled_profile_err += (nd4_profile - scaling_factor[0][1]) ** 2 * scaling_factor[1][0, 0]
@@ -144,36 +160,38 @@ for index in [0, 1]:
         weights_psf = np.concatenate((np.full((peak,), 4.50), np.full_like(tail, 1)))
         markers_on_psf = [peak, *tail]
 
-    psf_factor = curve_fit(scaling_gauss_func, psf[psf_region], scaled_profile[psf_region],
+    psf_factor = curve_fit(scaling_gauss_func, psf_profile[psf_region], scaled_profile[psf_region],
                            sigma=weights_psf, bounds=bounds_psf)
     print("psf factor", psf_factor)
 
-    psf_profile = scaling_gauss_func(psf, *psf_factor[0])
+    star_profile = scaling_gauss_func(psf_profile, *psf_factor[0])
+    star_profiles.append(star_profile)
 
-    psf_profile_err = psf_factor[0][0] ** 2 * psf_factor[1][1, 1]
-    psf_profile_err += (nd4_profile - psf_factor[0][1]) ** 2 * psf_factor[1][0, 0]
-    psf_profile_err = np.sqrt(psf_profile_err)
+    star_profile_err = psf_factor[0][0] ** 2 * psf_factor[1][1, 1]
+    star_profile_err += (nd4_profile - psf_factor[0][1]) ** 2 * psf_factor[1][0, 0]
+    star_profile_err = np.sqrt(star_profile_err)
 
-    disk_profile = cyc116_profile - psf_profile
-    disk_profile_err = psf_profile_err ** 2
+    disk_profile = cyc116_profile - star_profile
+    disk_profile_err = star_profile_err ** 2
     disk_profile_err += cyc116_err ** 2
     disk_profile_err = np.sqrt(disk_profile_err)
 
-    fig_comp = plt.figure(figsize=(14, 7))
-    textax = plt.axes([0.5, 0.95, 0.3, 0.03], figure=fig_comp)
+    fig_comp = plt.figure(figsize=(14, 6), num="Profiles " + profile[index])
+    textax = plt.axes([0.5, 0.9, 0.3, 0.03], figure=fig_comp)
     textax.axis('off')
-    textax.text(0, 0, "Comparison " + profile[index] + " of ND4 to cyc116", fontsize=18, ha='center')
+    textax.text(0, 0, profile[index], fontsize=18, ha='center')
 
     ax = fig_comp.add_subplot(1, 1, 1)
+    ax.tick_params(labelsize=18)
     ax.plot(x, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
     #  ax.fill_between(x, cyc116_profile + cyc116_err, cyc116_profile - cyc116_err, alpha=0.5, color='C0')
     ax.plot(x, scaled_profile, '-D', label=name, markevery=list(tail))
     nd4_equation = R"$({:.2e})\cdot(ND4-({:.2e}))$".format(*scaling_factor[0])
     ax.plot([], [], ' ', label=nd4_equation)
-    ax.plot(x, psf_profile, '-DC2', label="PSF profile", markevery=markers_on_psf)
+    ax.plot(x, star_profile, '-DC2', label="PSF profile", markevery=markers_on_psf)
     psf_equation = R"$({:.2e})\cdot(gauss(PSF,{:.2e})-({:.2e}))$".format(*psf_factor[0])
     ax.plot([], [], ' ', label=psf_equation)
-    ax.fill_between(range(22), psf_profile[:22] * 0.178, psf_profile[:22] * 3.16, alpha=0.5, color="gold")
+    # ax.fill_between(range(22), star_profile[:22] * 0.178, star_profile[:22] * 3.16, alpha=0.5, color="gold")
     ax.legend(fontsize='large', framealpha=1)
     ax.set_yscale('log', nonposy='clip')
     ax.set_ylim(ymin=y_min)
@@ -183,20 +201,22 @@ for index in [0, 1]:
     axins = ax.inset_axes([0.35, 0.55, 0.5, 0.43])
     axins.semilogy(x, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
     axins.semilogy(x, scaled_profile, '-D', label=name, markevery=list(tail))
-    axins.semilogy(x, psf_profile, '-D', label="PSF profile", markevery=markers_on_psf)
+    axins.semilogy(x, star_profile, '-D', label="PSF profile", markevery=markers_on_psf)
     axins.set_ylim(
-        (0.9 * np.min(psf_profile[zoom_xax[0]:zoom_xax[1]]), 1.05 * np.max(psf_profile[zoom_xax[0]:zoom_xax[1]])))
+        (0.9 * np.min(star_profile[zoom_xax[0]:zoom_xax[1]]), 1.05 * np.max(star_profile[zoom_xax[0]:zoom_xax[1]])))
     axins.set_xlim(zoom_xax)
     ax.indicate_inset_zoom(axins)
 
-    fig_sub = plt.figure(figsize=(16, 7))
-    textax = plt.axes([0.5, 0.95, 0.3, 0.03], figure=fig_sub)
+    fig_sub = plt.figure(figsize=(16, 7), num="Disk " + profile[index])
+    textax = plt.axes([0.5, 0.9, 0.3, 0.03], figure=fig_sub)
     textax.axis('off')
     textax.text(0, 0, "Subtraction in " + profile[index], fontsize=18, ha='center')
 
     ax = fig_sub.add_subplot(1, 1, 1)
+    ax.tick_params(labelsize=18)
     line1, = ax.plot(x, disk_profile, label="Reduced cyc116 profile")
     ax1 = ax.twinx()
+    ax1.tick_params(labelsize=18)
     line2, = ax1.plot(x2[20:], qphi[20:], "C3", label="Qphi profile")
     ax.tick_params(axis='y', labelcolor="C0")
     ax1.tick_params(axis='y', labelcolor="C3")
@@ -206,11 +226,11 @@ for index in [0, 1]:
     lines = [line1, line2, line3]
     align_yaxis(ax, 0, ax1, 0)
     ax.fill_between([32, 118], [-110, -110], [1000, 1000], alpha=0.2, color="gold")
-    ax.legend(lines, [line.get_label() for line in lines], fontsize='large', framealpha=1)
+    ax.legend(lines, [line.get_label() for line in lines], fontsize='x-large', framealpha=1)
 
     if save:
-        fig_comp.savefig(path + "/Comparison_" + profile[index] + ".png", dpi=150)
-        fig_sub.savefig(path + "/Subtraction_" + profile[index] + ".png", dpi=150)
+        fig_comp.savefig(path + "/Profiles_" + profile[index] + ".png", dpi=150, bbox_inches='tight', pad_inches=0.1)
+        fig_sub.savefig(path + "/Subtraction_" + profile[index] + ".png", dpi=150, bbox_inches='tight', pad_inches=0.1)
 
         param_file.write("\n" + profile[index] + "\n")
         param_file.write("Mixed: {}\n".format(mixed))
@@ -227,19 +247,69 @@ for index in [0, 1]:
 
     disk_profile[disk_profile < 0] = 0
     results.append([np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32), np.sum(qphi[24:118]),
-                    np.sum(psf_profile[:22]) - np.median(cyc116_profile[130:]) * 22])
+                    np.sum(star_profile[:20]) - np.mean(star_profile[20:40]) * 20])
     results_err.append(
         [np.sum(disk_profile_err[32:118] ** 2) - np.std(disk_profile[130:]) ** 2 * (118 - 32),
          np.sum(qphi_err[24:118] ** 2),
-         np.sum(psf_profile_err[:22] ** 2) - np.std(cyc116_profile[130:]) ** 2 * 22])
+         np.sum(star_profile_err[:22] ** 2) - np.std(cyc116_profile[130:]) ** 2 * 22])
     print("Counts fit: ", np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32))
     print("Qphi counts: ", np.sum(qphi[24:118]))
-    print("PSF counts: ", np.sum(psf_profile[:22]) - np.median(cyc116_profile[130:]) * 22)
+    print("PSF counts: ", np.sum(star_profile[:22]) - np.median(cyc116_profile[130:]) * 22)
     print("errors: ", results_err)
 
 if save:
     print("File saved")
     param_file.close()
+
+""" comparison """
+img_shape = (1024, 1024)
+cyc116_i = [np.sum(cyc116.get_i_img()[0][aperture(img_shape, 512, 512, r)]) for r in range(1, 100)]
+cyc116_r = [np.sum(cyc116.get_r_img()[0][aperture(img_shape, 512, 512, r)]) for r in range(1, 100)]
+
+circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 512)]
+circumference.insert(0, 1)
+
+scal_profiles[0] = scal_profiles[0] * circumference
+scal_profiles[1] = scal_profiles[1] * circumference
+
+star_profiles[0] = star_profiles[0] * circumference
+star_profiles[1] = star_profiles[1] * circumference
+
+scali = np.array([np.sum(scal_profiles[0][:r]) for r in range(1, 100)])
+scalr = np.array([np.sum(scal_profiles[1][:r]) for r in range(1, 100)])
+
+stari = np.array([np.sum(star_profiles[0][:r]) for r in range(1, 100)])
+starr = np.array([np.sum(star_profiles[1][:r]) for r in range(1, 100)])
+
+comp_nd4_i = cyc116_i / scali
+comp_nd4_r = cyc116_r / scalr
+
+comp_psf_i = scali / stari
+comp_psf_r = scalr / starr
+
+fig = plt.figure(figsize=(14, 6))
+textax = plt.axes([0.5, 0.9, 0.3, 0.03], figure=fig)
+textax.axis('off')
+textax.text(0, 0, "Comparison", fontsize=18, ha='center')
+ax = fig.add_subplot(1, 1, 1)
+ax.plot(np.arange(1, 100), comp_nd4_i, label="nd4_i")
+ax.plot(np.arange(1, 100), comp_nd4_r, label="nd4_r")
+ax.plot(np.arange(1, 100), comp_psf_i - 1, label="psf_i")
+ax.plot(np.arange(1, 100), comp_psf_r - 1, label="psf_r")
+ax.legend()
+if save:
+    fig.savefig(path + "/Comparison.png", dpi=150, bbox_inches='tight', pad_inches=0.1)
+
+print("Results:")
+results = np.array(results)
+print(results)
+results_err = np.sqrt(np.abs(results_err))
+print("I/R: ", results[0] / results[1])
+print(2.5 * np.log10(results[0] / results[1]))
+error = (results_err[0] / results[1]) ** 2
+error += (results_err[1] * results[0] / results[1] ** 2) ** 2
+error = np.sqrt(error)
+print("Errors: ", error)
 
 """ 2d attempt """
 
@@ -291,44 +361,37 @@ if save:
 # disk_map[disk_map < 0] = 0
 # print("Counts manual: ", np.sum(disk_map[disk]))
 
-# for obj in gc.get_objects():
-#     if isinstance(obj, StarImg):
-#         print(obj.name)
-#         x, radial = azimuthal_averaged_profile(obj.get_i_img()[0])
-#         # x, radial = half_azimuthal_averaged_profile(obj.get_i_img()[0])
-#         fig = plt.figure(num=obj.name)
-#         ax1 = fig.add_subplot(131)
-#         ax1.set_title("azimuthal rofile")
-#         ax1.semilogy(x, radial)
-#         ax2 = fig.add_subplot(132)
-#         ax2.set_title("first derivative")
-#         ax2.plot(x, np.gradient(radial))
-#         ax3 = fig.add_subplot(133)
-#         ax3.set_title("second derivative")
-#         sec = np.gradient(np.gradient(radial))
-#         sec_deriv_func = interpolate.interp1d(x, sec)
-#
-#
-#         def sec_deriv_sq(x):
-#             return sec_deriv_func(x) ** 2
-#
-#
-#         thin = np.linspace(x[0], x[-1], 10000)
-#         ax3.plot(thin, sec_deriv_sq(thin))
-#         results = diffraction_rings(radial, 19, width=10)
-#         print(np.array2string(results[0], precision=2))
-#         print(np.array2string(results[1], precision=2))
-#
-#         textax = plt.axes([0.5, 0.95, 0.3, 0.03])
-#         textax.axis('off')
-#         textax.text(0, 0, obj.name, fontsize=18, ha='center')
+""" Diffraction disk """
 
-print("Results:")
-results = np.array(results)
-results_err = np.sqrt(np.abs(results_err))
-print("I/R: ", results[0] / results[1])
-error = (results_err[0] / results[1]) ** 2
-error += (results_err[1] * results[0] / results[1] ** 2) ** 2
-error = np.sqrt(error)
-print("Errors: ", error)
+# for obj in [cyc116, ND4, PointSpread]:
+#     print(obj.name)
+#     x, radial = obj.azimuthal[0]
+#
+#     fig = plt.figure(num=obj.name)
+#     ax1 = fig.add_subplot(131)
+#     ax1.set_title("azimuthal rofile")
+#     ax1.semilogy(x, radial)
+#     ax2 = fig.add_subplot(132)
+#     ax2.set_title("first derivative")
+#     ax2.plot(x, np.gradient(radial))
+#     ax3 = fig.add_subplot(133)
+#     ax3.set_title("second derivative")
+#     sec = np.gradient(np.gradient(radial))
+#     sec_deriv_func = interpolate.interp1d(x, sec)
+#
+#
+#     def sec_deriv_sq(x):
+#         return sec_deriv_func(x) ** 2
+#
+#
+#     thin = np.linspace(x[0], x[-1], 10000)
+#     ax3.plot(thin, sec_deriv_sq(thin))
+#     results = diffraction_rings(radial, 19, width=10)
+#     print(np.array2string(results[0], precision=2))
+#     print(np.array2string(results[1], precision=2))
+#
+#     textax = plt.axes([0.5, 0.95, 0.3, 0.03])
+#     textax.axis('off')
+#     textax.text(0, 0, obj.name, fontsize=18, ha='center')
+
 plt.show()

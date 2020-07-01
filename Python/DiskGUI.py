@@ -24,15 +24,17 @@ def start(star_data: StarImg):
     # GUI setup
     fig, ax = plt.subplots(figsize=(18, 11))
 
-    axinner = plt.axes([0.58, 0.85, 0.35, 0.03], facecolor=axcolor)
-    axmiddle = plt.axes([0.58, 0.8, 0.35, 0.03], facecolor=axcolor)
-    axouter = plt.axes([0.58, 0.75, 0.35, 0.03], facecolor=axcolor)
+    ax.tick_params(labelsize=18)
+
+    axinner = plt.axes([0.6, 0.85, 0.35, 0.03], facecolor=axcolor)
+    axmiddle = plt.axes([0.6, 0.8, 0.35, 0.03], facecolor=axcolor)
+    axouter = plt.axes([0.6, 0.75, 0.35, 0.03], facecolor=axcolor)
 
     sinner = Slider(axinner, 'Inner radius', 0, 50.0, valinit=ir0, valstep=pixel)
     smiddle = Slider(axmiddle, 'Annulus Size', 0, 75, valinit=mr0, valstep=pixel)
     souter = Slider(axouter, 'Background size', 0, 50.0, valinit=or0, valstep=pixel)
 
-    rax = plt.axes([0.58, 0.60, 0.1, 0.1], facecolor=axcolor)
+    rax = plt.axes([0.6, 0.60, 0.1, 0.1], facecolor=axcolor)
     rax.set_title("Select wave band:")
     radio = RadioButtons(rax, ('I\'-band', 'R\'-band'), active=0)
     for circle in radio.circles:
@@ -41,7 +43,7 @@ def start(star_data: StarImg):
     resetax = plt.axes([0.85, 0.11, 0.08, 0.04])
     button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
 
-    textax = plt.axes([0.58, 0.5, 0.3, 0.03])
+    textax = plt.axes([0.6, 0.5, 0.3, 0.03])
     textax.axis('off')
 
     textaxis = [textax.text(0, 0, "Disk", fontsize=14, fontweight='bold', color='blue'),
@@ -59,7 +61,7 @@ def start(star_data: StarImg):
     disk_plot = ax.imshow(disk_map, cmap='gray', vmin=-50, vmax=100)
     disk_mask_plot = ax.imshow(disk_map, cmap='gray', vmin=-50, vmax=100)
 
-    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
+    plt.subplots_adjust(left=0.03, right=0.55, bottom=0.11)
 
     # interaction function
 

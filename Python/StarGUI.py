@@ -26,23 +26,25 @@ def start(star_data: StarImg):
 
     fig, ax = plt.subplots(figsize=(18, 11))
 
-    axinner = plt.axes([0.58, 0.85, 0.35, 0.03], facecolor=axcolor)
-    axouter = plt.axes([0.58, 0.8, 0.35, 0.03], facecolor=axcolor)
+    ax.tick_params(labelsize=18)
+
+    axinner = plt.axes([0.6, 0.85, 0.35, 0.03], facecolor=axcolor)
+    axouter = plt.axes([0.6, 0.8, 0.35, 0.03], facecolor=axcolor)
 
     sinner = Slider(axinner, 'Aperture Size', 0, 35.0, valinit=ir0, valstep=pixel)
     souter = Slider(axouter, 'Annulus SIze', 0, 20.0, valinit=or0, valstep=pixel)
 
-    rax = plt.axes([0.58, 0.65, 0.1, 0.1], facecolor=axcolor)
+    rax = plt.axes([0.6, 0.65, 0.1, 0.1], facecolor=axcolor)
     rax.set_title("Select wave band:")
     radio = RadioButtons(rax, ('I\'-band', 'R\'-band'), active=0)
     for circle in radio.circles:
         circle.set_radius(0.07)
 
-    resetax = plt.axes([0.85, 0.11, 0.08, 0.04])
+    resetax = plt.axes([0.87, 0.05, 0.08, 0.04])
     button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
 
     for index, name in enumerate(obj_names):
-        textax = plt.axes([0.65 - 0.1 * (-1) ** index, 0.62 - 0.21 * np.floor(index / 2), 0.3, 0.03])
+        textax = plt.axes([0.7 - 0.1 * (-1) ** index, 0.62 - 0.21 * np.floor(index / 2), 0.3, 0.03])
         textax.axis('off')
         textaxis = [textax.text(0, 0, name, fontsize=14, fontweight='bold', color='blue'),
                     textax.text(0, -1, "                     I'-band   R'-band"),
@@ -56,7 +58,7 @@ def start(star_data: StarImg):
     star_plot = ax.imshow(star_map, cmap='gray')
     star_mask_plot = ax.imshow(star_map, cmap='gray')
 
-    plt.subplots_adjust(left=0.01, right=0.54, bottom=0.11)
+    plt.subplots_adjust(left=0.03, right=0.55, bottom=0.11)
 
     # interaction function
 

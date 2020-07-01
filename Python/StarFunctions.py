@@ -4,7 +4,6 @@ from typing import List
 from scipy.optimize import curve_fit, least_squares
 from scipy import interpolate
 import numpy as np
-import mayavi.mlab as mlab
 import pickle
 import os
 
@@ -24,88 +23,53 @@ class OOI:
 
         return self.pos_x, self.pos_y
 
-    # def fitting_3d(self, irad, orad, image):
-    #     img = image.copy()[(self.pos_y - orad):(self.pos_y + orad),
-    #           (self.pos_x - orad):(self.pos_x + orad)].transpose()
-    #     mesh = np.array([[x, y] for x in range(2 * orad) for y in range(2 * orad)])
-    #     mesh_grid = np.meshgrid(range(2 * orad), range(2 * orad))
-    #     mask = []
-    #     color = []
-    #
-    #     for x in range(0, 2 * orad):
-    #         for y in range(0, 2 * orad):
-    #             if (x - orad) ** 2 + (y - orad) ** 2 <= irad ** 2:
-    #                 color.append(img[x, y] * 0.75)
-    #             elif irad <= (x - orad) ** 2 + (
-    #                     y - orad) ** 2 <= orad ** 2:
-    #                 mask.append([x, y, img[x, y]])
-    #                 color.append(img[x, y] * 0.5)
-    #             else:
-    #                 mask.append([x, y, img[x, y]])
-    #                 color.append(img[x, y] * 0.1)
-    #
-    #     mask = np.array(mask)
-    #     fit = curve_fit(poly_sec_ord, mask[:, :2], mask[:, 2])
-    #
-    #     """ background removal """
-    #
-    #     fig = plt.figure(figsize=(24, 10), num=self.name + " background removal")
-    #     fig.suptitle(self.name + " background removal")
-    #
-    #     ax = fig.add_subplot(1, 2, 1, projection='3d')
-    #     ax.scatter(mesh[:, 0], mesh[:, 1], img, c=color)
-    #     # ax.plot_surface(*mesh_grid, img)
-    #
-    #     ax = fig.add_subplot(1, 2, 2, projection='3d')
-    #
-    #     fitted_val = poly_sec_ord(mesh, *fit[0]).reshape((80, 80))
-    #
-    #     ax.scatter(mask[:, 0], mask[:, 1], mask[:, 2])
-    #     ax.scatter(mesh[:, 0], mesh[:, 1], fitted_val, c=color, alpha=0.4)
-    #
-    #     mlab.figure(figure=self.name + " background removal")
-    #     mlab.points3d(mask[:, 0], mask[:, 1], mask[:, 2], scale_mode="none", scale_factor=1)
-    #     mlab.points3d(mesh[:, 0], mesh[:, 1], fitted_val.flatten(), color, scale_mode="none", scale_factor=1)
-    #
-    #     """ Image without background """
-    #
-    #     fig = plt.figure(figsize=(8, 8), num=self.name + " final")
-    #     fig.suptitle(self.name + " without background")
-    #     ax = fig.add_subplot(1, 1, 1, projection='3d')
-    #     ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
-    #
-    #     mlab.figure(figure=self.name + " final")
-    #     mlab.surf(img - fitted_val)
-    #
-    #     """ moffat fit """
-    #
-    #     moffat_fit = curve_fit(moffat_2d, mesh, img.flatten() - fitted_val.flatten(), maxfev=25600,
-    #                            p0=(40, 40, 5000, 2, 25, -10),
-    #                            bounds=((35, 35, 0, 0, 0, -np.inf), (45, 45, np.inf, 10, np.inf, np.inf)))
-    #     fig = plt.figure(figsize=(8, 8), num=self.name + " woBG + fit")
-    #     fig.suptitle(self.name + " without background and fit")
-    #     ax = fig.add_subplot(1, 1, 1, projection='3d')
-    #     ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
-    #     ax.scatter(mesh[:, 0], mesh[:, 1], moffat_2d(mesh, *moffat_fit[0]))
-    #
-    #     mlab.figure(figure=self.name + " woBG + fit")
-    #     mlab.points3d(mesh[:, 0], mesh[:, 1], (img - fitted_val).flatten(), color=(0, 0, 1), scale_mode="none",
-    #                   scale_factor=1.75)
-    #     mlab.points3d(mesh[:, 0], mesh[:, 1], moffat_2d(mesh, *moffat_fit[0]), color=(1, 165 / 255, 0),
-    #                   scale_mode="none", scale_factor=1.75)
-    #
-    #     # plt.figure()
-    #     # print("test")
-    #     # fit21 = np.polyfit(x_mesh[0, :], img[:, 0], 1)
-    #     # fit22 = curve_fit(gauss, x_mesh[0, :], img[:, 0] - np.poly1d(fit21)(x_mesh[0, :]), [15, 7.5, 30, -5])
-    #     # plt.plot(x_mesh[0, :], img[:, 0])
-    #     # plt.plot(x_mesh[0, :], np.poly1d(fit21)(x_mesh[0, :]))
-    #     # plt.plot(x_mesh[0, :], img[:, 0] - np.poly1d(fit21)(x_mesh[0, :]))
-    #     # plt.plot(x_mesh[0, :], gauss(x_mesh[0, :], *fit22[0]))
-    #     # ax = fig.add_subplot(1, 2, 2, projection='3d')
-    #     # ax.scatter(x_mesh, y_mesh, img, c=color.flatten(), cmap='viridis')
-    #
-    #     return moffat_fit
+    def fitting_3d(self, irad, orad, image):
+        img = image.copy()[(self.pos_y - orad):(self.pos_y + orad),
+              (self.pos_x - orad):(self.pos_x + orad)].transpose()
+        mesh = np.array([[x, y] for x in range(2 * orad) for y in range(2 * orad)])
+        mesh_grid = np.meshgrid(range(2 * orad), range(2 * orad))
+        mask = []
+        mask_in = np.zeros_like(img, dtype=np.bool)
+        color = []
+
+        for x in range(0, 2 * orad):
+            for y in range(0, 2 * orad):
+                if (x - orad) ** 2 + (y - orad) ** 2 <= irad ** 2:
+                    mask_in[x, y] = True
+                    color.append(img[x, y] * 0.75)
+                elif irad <= (x - orad) ** 2 + (y - orad) ** 2 <= orad ** 2:
+                    mask.append([x, y, img[x, y]])
+                    color.append(img[x, y] * 0.5)
+                else:
+                    mask.append([x, y, img[x, y]])
+                    color.append(img[x, y] * 0.1)
+
+        mask = np.array(mask)
+        fit = curve_fit(poly_sec_ord, mask[:, :2], mask[:, 2])
+        # """ background removal """
+        #
+        # fig = plt.figure(figsize=(24, 10), num=self.name + " background removal")
+        # fig.suptitle(self.name + " background removal")
+        #
+        # ax = fig.add_subplot(1, 2, 1, projection='3d')
+        # ax.scatter(mesh[:, 0], mesh[:, 1], img, c=color)
+        # # ax.plot_surface(*mesh_grid, img)
+        #
+        # ax = fig.add_subplot(1, 2, 2, projection='3d')
+
+        fitted_val = poly_sec_ord(mesh, *fit[0]).reshape(img.shape)
+
+        # ax.scatter(mask[:, 0], mask[:, 1], mask[:, 2])
+        # ax.scatter(mesh[:, 0], mesh[:, 1], fitted_val, c=color, alpha=0.4)
+        """ Image without background """
+
+        # fig = plt.figure(figsize=(8, 8), num=self.name + " final")
+        # fig.suptitle(self.name + " without background")
+        # ax = fig.add_subplot(1, 1, 1, projection='3d')
+        # ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
+        # print(np.sum(img))
+        result = img - fitted_val
+        return np.sum(result[mask_in]), np.sum(img[mask_in])
 
 
 class StarImg:
@@ -286,11 +250,14 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
     img = image.copy()
     profile = []
     error = []
-    for r in range(0, radius):
-        mask = aperture(shape, size // 2, size // 2, r)
+    for r in range(1, radius):
+        mask = aperture(shape, size // 2, size // 2, r + 1)
 
         profile.append(np.nanmean(img[mask]))
-        n = np.nansum(mask)
+        n = np.nansum(mask) - np.count_nonzero(np.isnan(img))
+        # print(np.nanmean(img[mask]))
+        # print(np.nansum(img[mask]) / n)
+        # print(n)
         if n != 0:
             error.append(np.sqrt(np.nansum(img[mask])) / n)
         else:
