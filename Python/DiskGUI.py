@@ -87,10 +87,10 @@ def start(star_data: StarImg):
         else:
             magnitude = np.nan
 
-        textaxis[2].set_text("Total Count:  {:.0f}   {:.0f}".format(*total_counts))
-        textaxis[3].set_text("Average BG:  {:.0f}   {:.0f}".format(*bg_avgs))
-        textaxis[4].set_text("Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts))
-        textaxis[5].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, 2.5 * np.log10(ratio)))
+        textaxis[2].set_text("Total Count:  {:.4}   {:.4}".format(*total_counts))
+        textaxis[3].set_text("Average BG:  {:.4}   {:.4}".format(*bg_avgs))
+        textaxis[4].set_text("Counts wo BG:  {:.4}   {:.4}".format(*bg_counts))
+        textaxis[5].set_text("Ratio I/R and magnitude:  {:.4}   {:.4}".format(ratio, 2.5 * np.log10(ratio)))
 
         disk_mask_plot.set_data(disk_mask)
 

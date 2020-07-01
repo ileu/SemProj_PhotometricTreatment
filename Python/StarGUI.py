@@ -88,10 +88,10 @@ def start(star_data: StarImg):
                 magnitude = np.nan
 
             # print(ratio_err)
-            text[2].set_text("Total Count:  {:.0f}   {:.0f}".format(*total_counts[index]))
-            text[3].set_text("Average BG:  {:.0f}   {:.0f}".format(*bg_avgs[index]))
-            text[4].set_text("Counts wo BG:  {:.0f}   {:.0f}".format(*bg_counts[index]))
-            text[5].set_text("Ratio I/R and magnitude:  {:.4f}   {:.2f}".format(ratio, magnitude))
+            text[2].set_text("Total Count:  {:.4}   {:.4}".format(*total_counts[index]))
+            text[3].set_text("Average BG:  {:.4}   {:.4}".format(*bg_avgs[index]))
+            text[4].set_text("Counts wo BG:  {:.4}   {:.4}".format(*bg_counts[index]))
+            text[5].set_text("Ratio I/R and magnitude:  {:.4}   {:.2}".format(ratio, magnitude))
 
         star_mask_plot.set_data(star_mask)
 

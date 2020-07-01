@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import curve_fit, root_scalar
+from scipy.optimize import curve_fit
 from StarData import cyc116, ND4, PointSpread
 from datetime import datetime
 from scipy.ndimage import gaussian_filter1d
@@ -8,11 +8,6 @@ import StarGUI
 import DiskGUI
 from StarFunctions import aperture
 from StarData import cyc116_second_star, cyc116_ghost2
-
-test = cyc116.get_i_img()[0]
-
-print(cyc116_second_star.fitting_3d(20, 39, test))
-print(cyc116_ghost2.fitting_3d(20, 39, test))
 
 
 def scaling_func(pos, a, b):
@@ -91,15 +86,15 @@ peak = 32
 y_min = 0.1
 tail = np.linspace(120, 200, 8, dtype=int, endpoint=False)
 
-nd4_region = np.concatenate((np.arange(first, second), tail))
+nd4_region = np.arange(first, second)
 psf_region = np.concatenate((np.arange(first, peak), tail))
 
 markers_on_nd4 = [first, second, *tail]
 markers_on_psf = [peak, *tail]
-weights_nd4 = np.concatenate((np.full((21 - first,), 2), np.full((second - 21,), 1), np.full_like(tail, 1000)))
+weights_nd4 = np.concatenate((np.full((21 - first,), 2), np.full((second - 21,), 1)))
 weights_psf = np.concatenate((np.full((peak - first,), 3.5), np.full_like(tail, 1)))
 bounds_psf = ([0, -np.inf, 0], np.inf)
-save = False
+save = True
 smart = False
 mixed = True
 results = []
@@ -142,7 +137,7 @@ for index in [0, 1]:
     scaled_profile_err = np.sqrt(scaled_profile_err)
 
     mixed_profile = cyc116_profile.copy()
-    mixed_profile[:80] = scaled_profile[:80]
+    mixed_profile[:31] = scaled_profile[:31]
     if mixed:
         scaled_profile = mixed_profile
         name = "mixed ND4 profile"
@@ -171,7 +166,7 @@ for index in [0, 1]:
     star_profile_err += (nd4_profile - psf_factor[0][1]) ** 2 * psf_factor[1][0, 0]
     star_profile_err = np.sqrt(star_profile_err)
 
-    disk_profile = cyc116_profile - star_profile
+    disk_profile = scaled_profile - star_profile
     disk_profile_err = star_profile_err ** 2
     disk_profile_err += cyc116_err ** 2
     disk_profile_err = np.sqrt(disk_profile_err)
@@ -184,14 +179,12 @@ for index in [0, 1]:
     ax = fig_comp.add_subplot(1, 1, 1)
     ax.tick_params(labelsize=18)
     ax.plot(x, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
-    #  ax.fill_between(x, cyc116_profile + cyc116_err, cyc116_profile - cyc116_err, alpha=0.5, color='C0')
     ax.plot(x, scaled_profile, '-D', label=name, markevery=list(tail))
-    nd4_equation = R"$({:.2e})\cdot(ND4-({:.2e}))$".format(*scaling_factor[0])
+    nd4_equation = R"$({:.2})\cdot(ND4-({:.2}))$".format(*scaling_factor[0])
     ax.plot([], [], ' ', label=nd4_equation)
     ax.plot(x, star_profile, '-DC2', label="PSF profile", markevery=markers_on_psf)
-    psf_equation = R"$({:.2e})\cdot(gauss(PSF,{:.2e})-({:.2e}))$".format(*psf_factor[0])
+    psf_equation = R"$({:.2})\cdot(gauss(PSF,{:.2})-({:.2}))$".format(*psf_factor[0])
     ax.plot([], [], ' ', label=psf_equation)
-    # ax.fill_between(range(22), star_profile[:22] * 0.178, star_profile[:22] * 3.16, alpha=0.5, color="gold")
     ax.legend(fontsize='large', framealpha=1)
     ax.set_yscale('log', nonposy='clip')
     ax.set_ylim(ymin=y_min)
@@ -262,45 +255,31 @@ if save:
     param_file.close()
 
 """ comparison """
+cutoff = 80
 
-img_shape = (1024, 1024)
-circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
+_, cyc116_i, _ = np.array(cyc116.azimuthal[0])
+_, cyc116_r, _ = np.array(cyc116.azimuthal[1])
 
-_, cyc116_i, _ = np.array(cyc116.azimuthal[0]) * circumference
-_, cyc116_r, _ = np.array(cyc116.azimuthal[1]) * circumference
+comp_nd4_i = cyc116_i / scal_profiles[0]
+comp_nd4_r = cyc116_r / scal_profiles[1]
 
-scal_profiles[0] = scal_profiles[0] * circumference
-scal_profiles[1] = scal_profiles[1] * circumference
-
-star_profiles[0] = star_profiles[0] * circumference
-star_profiles[1] = star_profiles[1] * circumference
-
-
-def sum_compare(y1, y2, cutoff: int = None):
-    if cutoff is not None:
-        if cutoff > len(y1):
-            raise
-    else:
-        cutoff = len(y1)
-    ratio = [np.sum(y1[:r]) / np.sum(y2[:r]) for r in range(1, cutoff + 1)]
-    return np.array(ratio)
-
-
-comp_nd4_i = sum_compare(cyc116_i, scal_profiles[0], 100)
-comp_nd4_r = sum_compare(cyc116_r, scal_profiles[1], 100)
-
-comp_psf_i = sum_compare(scal_profiles[0], star_profiles[0], 100)
-comp_psf_r = sum_compare(scal_profiles[1], star_profiles[1], 100)
+comp_psf_i = scal_profiles[0] / star_profiles[0]
+comp_psf_r = scal_profiles[1] / star_profiles[1]
 
 fig = plt.figure(figsize=(14, 6))
 textax = plt.axes([0.5, 0.9, 0.3, 0.03], figure=fig)
 textax.axis('off')
 textax.text(0, 0, "Comparison", fontsize=18, ha='center')
 ax = fig.add_subplot(1, 1, 1)
-ax.plot(np.arange(100), comp_nd4_i, label="nd4_i")
-ax.plot(np.arange(100), comp_nd4_r, label="nd4_r")
-ax.plot(np.arange(100), comp_psf_i - 1, label="psf_i")
-ax.plot(np.arange(100), comp_psf_r - 1, label="psf_r")
+ax.tick_params(labelsize=18)
+ax.locator_params(axis='y', nbins=8)
+ax.plot(np.arange(cutoff), comp_nd4_i[:cutoff], label="nd4_i")
+ax.plot(np.arange(cutoff), comp_nd4_r[:cutoff], label="nd4_r")
+ax.axhline(0.9, ls='--', c='k', alpha=0.125, zorder=-1)
+ax.axhline(1.1, ls='--', c='k', alpha=0.125, zorder=-1)
+ax.fill_between([first, second], [0.9, 0.9], [1.1, 1.1], alpha=0.2, color="gold")
+# ax.plot(np.arange(cutoff), comp_psf_i[:cutoff], label="psf_i")
+# ax.plot(np.arange(cutoff), comp_psf_r[:cutoff], label="psf_r")
 ax.legend()
 if save:
     fig.savefig(path + "/Comparison.png", dpi=150, bbox_inches='tight', pad_inches=0.1)
