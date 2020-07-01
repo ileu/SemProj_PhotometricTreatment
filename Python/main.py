@@ -262,12 +262,12 @@ if save:
     param_file.close()
 
 """ comparison """
-img_shape = (1024, 1024)
-cyc116_i = [np.sum(cyc116.get_i_img()[0][aperture(img_shape, 512, 512, r)]) for r in range(1, 100)]
-cyc116_r = [np.sum(cyc116.get_r_img()[0][aperture(img_shape, 512, 512, r)]) for r in range(1, 100)]
 
-circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 512)]
-circumference.insert(0, 1)
+img_shape = (1024, 1024)
+circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
+
+_, cyc116_i, _ = np.array(cyc116.azimuthal[0]) * circumference
+_, cyc116_r, _ = np.array(cyc116.azimuthal[1]) * circumference
 
 scal_profiles[0] = scal_profiles[0] * circumference
 scal_profiles[1] = scal_profiles[1] * circumference
@@ -275,27 +275,32 @@ scal_profiles[1] = scal_profiles[1] * circumference
 star_profiles[0] = star_profiles[0] * circumference
 star_profiles[1] = star_profiles[1] * circumference
 
-scali = np.array([np.sum(scal_profiles[0][:r]) for r in range(1, 100)])
-scalr = np.array([np.sum(scal_profiles[1][:r]) for r in range(1, 100)])
 
-stari = np.array([np.sum(star_profiles[0][:r]) for r in range(1, 100)])
-starr = np.array([np.sum(star_profiles[1][:r]) for r in range(1, 100)])
+def sum_compare(y1, y2, cutoff: int = None):
+    if cutoff is not None:
+        if cutoff > len(y1):
+            raise
+    else:
+        cutoff = len(y1)
+    ratio = [np.sum(y1[:r]) / np.sum(y2[:r]) for r in range(1, cutoff + 1)]
+    return np.array(ratio)
 
-comp_nd4_i = cyc116_i / scali
-comp_nd4_r = cyc116_r / scalr
 
-comp_psf_i = scali / stari
-comp_psf_r = scalr / starr
+comp_nd4_i = sum_compare(cyc116_i, scal_profiles[0], 100)
+comp_nd4_r = sum_compare(cyc116_r, scal_profiles[1], 100)
+
+comp_psf_i = sum_compare(scal_profiles[0], star_profiles[0], 100)
+comp_psf_r = sum_compare(scal_profiles[1], star_profiles[1], 100)
 
 fig = plt.figure(figsize=(14, 6))
 textax = plt.axes([0.5, 0.9, 0.3, 0.03], figure=fig)
 textax.axis('off')
 textax.text(0, 0, "Comparison", fontsize=18, ha='center')
 ax = fig.add_subplot(1, 1, 1)
-ax.plot(np.arange(1, 100), comp_nd4_i, label="nd4_i")
-ax.plot(np.arange(1, 100), comp_nd4_r, label="nd4_r")
-ax.plot(np.arange(1, 100), comp_psf_i - 1, label="psf_i")
-ax.plot(np.arange(1, 100), comp_psf_r - 1, label="psf_r")
+ax.plot(np.arange(100), comp_nd4_i, label="nd4_i")
+ax.plot(np.arange(100), comp_nd4_r, label="nd4_r")
+ax.plot(np.arange(100), comp_psf_i - 1, label="psf_i")
+ax.plot(np.arange(100), comp_psf_r - 1, label="psf_r")
 ax.legend()
 if save:
     fig.savefig(path + "/Comparison.png", dpi=150, bbox_inches='tight', pad_inches=0.1)

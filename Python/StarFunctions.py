@@ -78,9 +78,9 @@ class StarImg:
         self.images = np.array([img_i, img_r])
         self.disk = None
         self.radial: np.ndarray = []
-        self.half_azimuthal = []
-        self.azimuthal = []
-        self.azimuthal_qphi = []
+        self.azimuthal: np.ndarray = []
+        self.half_azimuthal: np.ndarray = []
+        self.azimuthal_qphi: np.ndarray = []
         self.objects: List[OOI] = []
         self.flux: List[float] = []
         self.wavelength: List[float] = []
@@ -94,7 +94,7 @@ class StarImg:
             self.half_azimuthal.append(half_azimuthal_averaged_profile(img.data[0], err=True))
             self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index][0], err=True))
 
-        save = [self.radial, self.azimuthal, self.half_azimuthal, self.azimuthal_qphi]
+        save = [np.array(self.radial), self.azimuthal, self.half_azimuthal, self.azimuthal_qphi]
 
         pickle.dump(save, open(full_file_path + "/../Data/" + self.name + "_save.p", "wb"))
         print("File saved")
@@ -250,7 +250,7 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
     img = image.copy()
     profile = []
     error = []
-    for r in range(1, radius):
+    for r in range(0, radius):
         mask = aperture(shape, size // 2, size // 2, r + 1)
 
         profile.append(np.nanmean(img[mask]))
@@ -259,7 +259,7 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
         # print(np.nansum(img[mask]) / n)
         # print(n)
         if n != 0:
-            error.append(np.sqrt(np.nansum(img[mask])) / n)
+            error.append(np.sqrt(np.abs(np.nansum(img[mask])))/ n)
         else:
             error.append(0)
 
