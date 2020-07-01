@@ -316,56 +316,6 @@ error += (results_err[1] * results[0] / results[1] ** 2) ** 2
 error = np.sqrt(error)
 print("Errors: ", error)
 
-""" 2d attempt """
-
-# first = 11
-# second = 38
-# y_min = 0.1
-# markers_on = [first, second]
-# profile = ["I-band", "R-band"]
-# a = 1000
-#
-# for index in [0]:
-#     print(profile[index])
-#     map1 = cyc116.get_i_img()[index]
-#     map2 = ND4.get_i_img()[index]
-#     _, radial2 = ND4.azimuthal[index]
-#     psf = PointSpread.get_i_img()[index]
-#
-#     qphi = cyc116.radial[index, 0]
-#
-#     region = annulus(map1[0].size, second, first)
-#     outer_region = annulus(map1[0].size, np.inf, 200)
-#     disk = annulus(map1[0].size, 125, 32)
-#
-#     guess = (1.0 / ND4.filter_reduction[index], np.median(radial2[100:]))
-#     print("guess: ", guess)
-#     max_cor = np.argmax(map2[region])
-#     print("maximum location", max_cor)
-#     print(map2[region].flatten()[max_cor])
-#     psf_factor = guess[0] * (map2[region].flatten()[max_cor] - guess[1]) / psf[region].flatten()[max_cor]
-#     print("psf factor:", psf_factor)
-
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[512, :])
-# plt.semilogy(range(0, 1024), guess[0] * (map2[512, :] - guess[1]))  # links rechts
-# plt.semilogy(range(0, 1024), psf_factor * psf[512, :])
-#
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[:, 512])
-# plt.semilogy(range(0, 1024), guess[0] * (map2[:, 512] - guess[1]))  # oben unten
-# plt.semilogy(range(0, 1024), psf_factor * psf[:, 512])
-#
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[512, :] - psf_factor * psf[512, :])
-#
-# plt.figure()
-# plt.semilogy(range(0, 1024), map1[:, 512] - psf_factor * psf[:, 512])
-
-# disk_map = map1 - psf_factor * psf
-# disk_map[disk_map < 0] = 0
-# print("Counts manual: ", np.sum(disk_map[disk]))
-
 """ Diffraction disk """
 
 # for obj in [cyc116, ND4, PointSpread]:
