@@ -9,7 +9,7 @@ plt.rcParams["image.origin"] = 'lower'
 def start(star_data: StarImg):
     # Start parameters
     ir0 = 16
-    or0 = 12
+    or0 = 32
     rinner = ir0
     router = or0
     a = 1e-2
@@ -29,10 +29,10 @@ def start(star_data: StarImg):
     ax.tick_params(labelsize=18)
 
     axinner = plt.axes([0.6, 0.85, 0.35, 0.03], facecolor=axcolor)
-    axouter = plt.axes([0.6, 0.8, 0.35, 0.03], facecolor=axcolor)
+    axouter = plt.axes([0.6, 0.78, 0.35, 0.03], facecolor=axcolor)
 
     sinner = Slider(axinner, 'Aperture Size', 0, 35.0, valinit=ir0, valstep=pixel)
-    souter = Slider(axouter, 'Annulus SIze', 0, 20.0, valinit=or0, valstep=pixel)
+    souter = Slider(axouter, 'Annulus SIze', 35, 55, valinit=or0, valstep=pixel)
 
     rax = plt.axes([0.6, 0.65, 0.1, 0.1], facecolor=axcolor)
     rax.set_title("Select wave band:")
@@ -72,7 +72,7 @@ def start(star_data: StarImg):
         rinner = sinner.val
         router = souter.val
 
-        star_mask, total_counts, bg_counts, bg_avgs = star_data.mark_objects(rinner, rinner + router)
+        star_mask, total_counts, bg_counts, bg_avgs = star_data.mark_objects(rinner, router)
 
         for index, text in enumerate(textaxes):
             # print(obj.name)
