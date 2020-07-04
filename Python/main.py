@@ -7,7 +7,7 @@ from datetime import datetime
 from scipy.ndimage import gaussian_filter1d
 import StarGUI
 import DiskGUI
-from StarFunctions import aperture, magnitude_wavelength_plot
+from StarFunctions import aperture, magnitude_wavelength_plot, photometrie_poly, photometrie
 
 
 def scaling_func(pos, a, b):
@@ -100,26 +100,27 @@ def disk_plot():
 
 """ GUI """
 
-StarGUI.start(cyc116)
+# StarGUI.start(cyc116)
 
 # DiskGUI.start(cyc116)
 
 """ Plots """
 
 print("----- 3d Background -----")
-test = cyc116.get_i_img()[0]
 
-print(cyc116_second_star.fitting_3d(20, 39, test))
-print(cyc116_ghost2.fitting_3d(20, 39, test))
+print(photometrie_poly(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img()[0]))
+print(photometrie_poly(20, 39, cyc116_ghost2.get_pos(), cyc116.get_i_img()[0]))
 
-print(count(20, 39, test, cyc116.get_r_img()[0]))
+print(photometrie(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img(), cyc116.get_r_img()))
 annulus_plot()
 
 filter_plot()
+
+overview_plot()
+
+disk_plot()
+
 plt.show()
-# overview_plot()
-#
-# disk_plot()
 
 print()
 """ Fits """
@@ -141,7 +142,7 @@ weights_nd4 = np.concatenate((np.full((21 - start_int,), 1), np.full((end_int - 
 weights_psf = np.concatenate((np.full((end_peak - start_peak,), 15), np.full_like(tail, 1)))
 bounds_psf = ([0, -np.inf, 0], np.inf)
 
-save = True
+save = False
 smart = False
 
 results = []
@@ -359,17 +360,15 @@ print("------- Aperture -------")
 print("Big apperture ratios")
 for observation in [cyc116, ND4, PointSpread]:
     print(observation.name)
-    ratio = np.sum(observation.get_i_img()[0][BigBoy_app]) / np.sum(observation.get_r_img()[0][BigBoy_app])
-    print("Ratio: {:.3}".format(ratio))
-    print("Log: {:.3}".format(np.log10(ratio)))
+    result = photometrie(416,50,(512,512), observation.get_i_img(),observation.get_r_img())
+    print(result)
     print()
 
 circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
 
 print("Mixed profile")
-ratio = np.sum((mixed_profiles[0] * circumference)[:416]) / np.sum((mixed_profiles[1] * circumference)[:416])
-print("Ratio: {:.3}".format(ratio))
-print("Log: {:.3}".format(np.log10(ratio)))
+result = [np.sum((mixed_profiles[0] * circumference)[:416]), np.sum((mixed_profiles[1] * circumference)[:416])]
+print(result)
 print()
 
 magnitude_wavelength_plot(HD100453_fluxes, (Rband_filter, Iband_filter))

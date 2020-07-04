@@ -44,27 +44,26 @@ def magnitude_wavelength_plot(fix_points, x):
     print("------------------")
 
 
-def photometrie(irad: int, orad: int, data_i: np.ndarray, data_r: np.ndarray, pos: tuple, displ: int = 1, scale: int = 1):
-    displacement = [x for x in range(-displ, displ + 1)]
-
+def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np.ndarray, displ: int = 1,
+                scale: int = 1, poly: bool = False):
+    displacement_range = np.arange(-displ, displ + 1)
+    radius_range = np.arange(-scale, scale + 1)
     shape = data_i[0].shape
     results = np.full((2 * displ + 1, 2 * displ + 1, 2 * scale + 1, 4), np.nan)
 
-    for index_r, inner_range in np.ndenumerate(np.arange(-scale, scale + 1)):
-        for shift in itertools.product(displacement, repeat=2):
-            print(shift, inner_range)
+    for index_r, inner_range in np.ndenumerate(radius_range):
+        for shift in itertools.product(displacement_range, repeat=2):
             new_pos = tuple(map(sum, zip(pos, shift)))
-
             i_mask = aperture(shape, *new_pos, irad + inner_range)
             o_mask = aperture(shape, *new_pos, orad, irad + inner_range)
 
             flux_iq = np.sum(data_i[0][i_mask]) - np.sum(i_mask) * np.mean(data_i[0][o_mask])
             flux_rq = np.sum(data_r[0][i_mask]) - np.sum(i_mask) * np.mean(data_r[0][o_mask])
-            flux_iu = np.sum(data_i[1][i_mask]) - np.sum(i_mask) * np.mean(data_i[1][o_mask])
-            flux_ru = np.sum(data_r[1][i_mask]) - np.sum(i_mask) * np.mean(data_r[1][o_mask])
-            results[shift[0] + displ, shift[1] + displ, index_r] = [flux_iq, flux_iu, flux_rq, flux_ru]
+            flux_iu = np.sum(data_i[2][i_mask]) - np.sum(i_mask) * np.mean(data_i[2][o_mask])
+            flux_ru = np.sum(data_r[2][i_mask]) - np.sum(i_mask) * np.mean(data_r[2][o_mask])
+            results[shift[0] + displ, shift[1] + displ, index_r[0]] = [flux_iq, flux_iu, flux_rq, flux_ru]
 
-        return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2))
+    return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2))
 
 
 def azimuthal_averaged_profile(image: np.ndarray, err=False):
@@ -92,35 +91,56 @@ def azimuthal_averaged_profile(image: np.ndarray, err=False):
     return np.arange(0, radius), np.array(profile)
 
 
-def half_azimuthal_averaged_profile(image: np.ndarray, err=False):
-    size = image[0].size
-    radius = size // 2
-    cx, cy = size // 2, size // 2
-    x, y = np.arange(0, 2 * radius), np.arange(0, 2 * radius)
-    img = image.copy()
-    profile = [img[radius, radius]]
-    error = []
-    for r in range(1, radius):
-        neg_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & \
-                   (x[np.newaxis, :] < radius)
-        pos_mask = ((x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 <= r ** 2) & \
-                   (x[np.newaxis, :] >= radius)
-
-        profile.append(np.average(img[pos_mask]))
-        profile.insert(0, np.average(img[neg_mask]))
-        error.append(np.std(img[pos_mask]) / np.sqrt(len(img[pos_mask])))
-        error.insert(0, np.std(img[neg_mask]) / np.sqrt(len(img[neg_mask])))
-
-    plt.show()
-    if err:
-        return np.arange(-radius, radius), np.array(profile), np.array(error)
-
-    return np.arange(-radius, radius), np.array(profile)
-
-
 def poly_sec_ord(pos, x0, y0, axx, ayy, axy, bx, by, c):
     return axx * (pos[:, 0] - x0) ** 2 + ayy * (pos[:, 1] - y0) ** 2 + axy * (pos[:, 0] - x0) * (
             pos[:, 1] - y0) + bx * (pos[:, 0] - x0) + by * (pos[:, 1] - y0) + c
+
+
+def photometrie_poly(irad, orad, pos, image):
+    img = image.copy()[(pos[1] - orad):(pos[1] + orad),
+          (pos[0] - orad):(pos[0] + orad)].transpose()
+    mesh = np.array([[x, y] for x in range(2 * orad) for y in range(2 * orad)])
+    mask = []
+    mask_in = np.zeros_like(img, dtype=np.bool)
+    color = []
+
+    for x in range(0, 2 * orad):
+        for y in range(0, 2 * orad):
+            if (x - orad) ** 2 + (y - orad) ** 2 <= irad ** 2:
+                mask_in[x, y] = True
+                color.append(img[x, y] * 0.75)
+            elif irad <= (x - orad) ** 2 + (y - orad) ** 2 <= orad ** 2:
+                mask.append([x, y, img[x, y]])
+                color.append(img[x, y] * 0.5)
+            else:
+                mask.append([x, y, img[x, y]])
+                color.append(img[x, y] * 0.1)
+
+    mask = np.array(mask)
+    fit = curve_fit(poly_sec_ord, mask[:, :2], mask[:, 2])
+    # """ background removal """
+    #
+    # fig = plt.figure(figsize=(24, 10), num=self.name + " background removal")
+    # fig.suptitle(self.name + " background removal")
+    #
+    # ax = fig.add_subplot(1, 2, 1, projection='3d')
+    # ax.scatter(mesh[:, 0], mesh[:, 1], img, c=color)
+    # # ax.plot_surface(*mesh_grid, img)
+    #
+    # ax = fig.add_subplot(1, 2, 2, projection='3d')
+    # ax.scatter(mask[:, 0], mask[:, 1], mask[:, 2])
+    # ax.scatter(mesh[:, 0], mesh[:, 1], fitted_val, c=color, alpha=0.4)
+    """ Image without background """
+
+    fitted_val = poly_sec_ord(mesh, *fit[0]).reshape(img.shape)
+
+    # fig = plt.figure(figsize=(8, 8), num=self.name + " final")
+    # fig.suptitle(self.name + " without background")
+    # ax = fig.add_subplot(1, 1, 1, projection='3d')
+    # ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
+    # print(np.sum(img))
+    result = img - fitted_val
+    return np.sum(result[mask_in]), np.sum(img[mask_in])
 
 
 def diffraction_rings(profile: np.ndarray, estimate: int, width: int = 6):
@@ -149,94 +169,34 @@ class OOI:
 
         return self.pos_x, self.pos_y
 
-    def fitting_3d(self, irad, orad, image):
-        img = image.copy()[(self.pos_y - orad):(self.pos_y + orad),
-              (self.pos_x - orad):(self.pos_x + orad)].transpose()
-        mesh = np.array([[x, y] for x in range(2 * orad) for y in range(2 * orad)])
-        mask = []
-        mask_in = np.zeros_like(img, dtype=np.bool)
-        color = []
-
-        for x in range(0, 2 * orad):
-            for y in range(0, 2 * orad):
-                if (x - orad) ** 2 + (y - orad) ** 2 <= irad ** 2:
-                    mask_in[x, y] = True
-                    color.append(img[x, y] * 0.75)
-                elif irad <= (x - orad) ** 2 + (y - orad) ** 2 <= orad ** 2:
-                    mask.append([x, y, img[x, y]])
-                    color.append(img[x, y] * 0.5)
-                else:
-                    mask.append([x, y, img[x, y]])
-                    color.append(img[x, y] * 0.1)
-
-        mask = np.array(mask)
-        fit = curve_fit(poly_sec_ord, mask[:, :2], mask[:, 2])
-        # """ background removal """
-        #
-        # fig = plt.figure(figsize=(24, 10), num=self.name + " background removal")
-        # fig.suptitle(self.name + " background removal")
-        #
-        # ax = fig.add_subplot(1, 2, 1, projection='3d')
-        # ax.scatter(mesh[:, 0], mesh[:, 1], img, c=color)
-        # # ax.plot_surface(*mesh_grid, img)
-        #
-        # ax = fig.add_subplot(1, 2, 2, projection='3d')
-
-        fitted_val = poly_sec_ord(mesh, *fit[0]).reshape(img.shape)
-
-        # ax.scatter(mask[:, 0], mask[:, 1], mask[:, 2])
-        # ax.scatter(mesh[:, 0], mesh[:, 1], fitted_val, c=color, alpha=0.4)
-        """ Image without background """
-
-        # fig = plt.figure(figsize=(8, 8), num=self.name + " final")
-        # fig.suptitle(self.name + " without background")
-        # ax = fig.add_subplot(1, 1, 1, projection='3d')
-        # ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
-        # print(np.sum(img))
-        result = img - fitted_val
-        return np.sum(result[mask_in]), np.sum(img[mask_in])
-
 
 class StarImg:
     def __init__(self, name, img_i, img_r):
         self.name: str = name
         self.images = np.array([img_i, img_r])
         self.disk = None
-        self.radial: np.ndarray = []
-        self.azimuthal: np.ndarray = []
-        self.half_azimuthal: np.ndarray = []
-        self.azimuthal_qphi: np.ndarray = []
+        self.radial = []
+        self.azimuthal = []
+        self.azimuthal_qphi = []
         self.objects: List[OOI] = []
-        self.flux: List[float] = []
-        self.wavelength: List[float] = []
-        self.filter_reduction: List[float] = []
+        self.filter_reduction = [1, 1]
 
     def save(self):
         print(self.name)
         self.calc_radial_polarization()
         for index, img in enumerate(self.images):
             self.azimuthal.append(azimuthal_averaged_profile(img.data[0], err=True))
-            self.half_azimuthal.append(half_azimuthal_averaged_profile(img.data[0], err=True))
             self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index][0], err=True))
 
-        save = [np.array(self.radial), self.azimuthal, self.half_azimuthal, self.azimuthal_qphi]
+        save = [np.array(self.radial), self.azimuthal, self.azimuthal_qphi]
 
         pickle.dump(save, open(full_file_path + "/../Data/" + self.name + "_save.p", "wb"))
         print("File saved")
 
     def load(self):
-        [self.radial, self.azimuthal, self.half_azimuthal, self.azimuthal_qphi] = pickle.load(
+        [self.radial, self.azimuthal, self.azimuthal_qphi] = pickle.load(
             open(full_file_path + "/../Data/" + self.name + "_save.p", "rb"))
         print("File loaded")
-
-    def set_filter(self, i_filter, r_filter):
-        self.filter_reduction = [i_filter, r_filter]
-
-    def set_flux_bvg(self, b, v, g):
-        self.flux = [b, v, g]
-
-    def set_wavelength(self, i_length, rlength):
-        self.wavelength = [i_length, rlength]
 
     def get_i_img(self):
         return self.images[0].data

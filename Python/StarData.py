@@ -32,7 +32,7 @@ Iband_filter = 789.7
 HD100453_fluxes = np.array([[8.09, 445], [7.79, 551], [7.7196, 464], [6.945, 1220], [6.39, 1630], [5.6, 2190]])
 
 ND4_filter = interpolate.interp1d(ND4_filter_data[:, 0], ND4_filter_data[:, 3])
-ND4.set_filter(ND4_filter(Iband_filter), ND4_filter(Rband_filter))
+ND4.filter_reduction = [ND4_filter(Iband_filter), ND4_filter(Rband_filter)]
 
 cyc116_main_star = OOI("Main Star", 511, 512)
 cyc116_second_star = OOI("Second star", 301, 307)
@@ -46,7 +46,6 @@ ND4_second_star = OOI("Second star", 301, 307)
 ND4_third_star = OOI("Third star", 298, 724)
 ND4_ghost1 = OOI("Ghost 1", 237, 386)
 ND4_ghost2 = OOI("Ghost 2", 891, 598)
-
 
 cyc116.add_object(cyc116_second_star)
 cyc116.add_object(cyc116_third_star)
