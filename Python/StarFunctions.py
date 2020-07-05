@@ -188,10 +188,11 @@ class StarImg:
         self.filter_reduction = [1, 1]
 
     def save(self):
-        print(self.name)
+        print("Saving ",self.name)
         self.calc_radial_polarization()
         for index, img in enumerate(self.images):
             self.azimuthal.append(azimuthal_averaged_profile(img.data[0], err=True))
+            self.azimuthal.append(azimuthal_averaged_profile(img.data[2], err=True))
             self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index][0], err=True))
 
         save = [np.array(self.radial), self.azimuthal, self.azimuthal_qphi]

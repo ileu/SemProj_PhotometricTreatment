@@ -107,28 +107,36 @@ def aperture_photometrie():
     print()
 
     print("------- Aperture -------")
-    print("Big apperture ratios")
+    print("Big aperture ratios")
     for observation in [cyc116, ND4, PointSpread]:
         print(observation.name)
         result = photometrie(416, 466, (512, 512), observation.get_i_img(), observation.get_r_img(),
                              trans_filter=observation.filter_reduction)
         print(result)
+        print(result[1]/result[0])
         print()
 
     circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
 
     print("Mixed profile")
 
-    data_i = mixed_profiles[0] * circumference
-    data_r = mixed_profiles[1] * circumference
-    res_i = []
-    res_r = []
+    data_iq = mixed_profiles[0] * circumference
+    data_iu = mixed_profiles[1] * circumference
+    data_rq = mixed_profiles[2] * circumference
+    data_ru = mixed_profiles[3] * circumference
+    res_iq = []
+    res_iu = []
+    res_rq = []
+    res_ru = []
 
     for rad_displ in np.arange(-1, 2):
-        res_i.append(np.sum(data_i[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_i[(416 + rad_displ):467]))
-        res_r.append(np.sum(data_r[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_r[(416 + rad_displ):467]))
+        res_iq.append(np.sum(data_iq[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_iq[(416 + rad_displ):467]))
+        res_iu.append(np.sum(data_iu[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_iu[(416 + rad_displ):467]))
+        res_rq.append(np.sum(data_rq[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_rq[(416 + rad_displ):467]))
+        res_ru.append(np.sum(data_ru[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_ru[(416 + rad_displ):467]))
 
-    print([np.mean(res_i), np.mean(res_r)], [np.std(res_i), np.std(res_r)])
+    print([np.mean(res_iq), np.mean(res_rq)], [np.std(res_iq)/np.mean(res_iq), np.std(res_rq)/np.mean(res_rq)])
+    print([np.mean(res_iu), np.mean(res_ru)], [np.std(res_iu)/np.mean(res_iu), np.std(res_ru)/np.mean(res_ru)])
     print()
 
     magnitude_wavelength_plot(HD100453_fluxes, (Rband_filter, Iband_filter))
@@ -178,7 +186,7 @@ scal_profiles = []
 mixed_profiles = []
 star_profiles = []
 
-profile = ["I-band", "R-band"]
+profile = ["I-band $I_Q$", "I-band $I_U$", "R-band $I_Q$", "R-band $I_U$"]
 
 if save:
     folder = datetime.now().strftime('%d_%m_%H%M')
@@ -187,7 +195,7 @@ if save:
 
     param_file = open(path + "/parameters.txt", "w")
 
-for index in [0, 1]:
+for index, _ in enumerate(profile):
     print(profile[index])
     # cyc116_img = cyc116.get_i_img()[0]
     radi, cyc116_profile, cyc116_err = cyc116.azimuthal[index]
@@ -195,9 +203,9 @@ for index in [0, 1]:
 
     _, psf_profile, psf_err = PointSpread.azimuthal[index]
 
-    x2, qphi, qphi_err = cyc116.azimuthal_qphi[index]
+    x2, qphi, qphi_err = cyc116.azimuthal_qphi[index // 2]
 
-    guess = (1.0 / ND4.filter_reduction[index], np.median(nd4_profile[100:]))
+    guess = (1.0 / ND4.filter_reduction[index // 2], np.median(nd4_profile[100:]))
     print("guess: ", guess)
 
     scaling_factor = curve_fit(scaling_func, nd4_profile[nd4_region], cyc116_profile[nd4_region], p0=guess,
