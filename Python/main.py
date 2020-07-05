@@ -19,7 +19,7 @@ def scaling_gauss_func(pos, a, b, sig):
 
 
 def mkdir_p(mypath):
-    '''Creates a directory. equivalent to using mkdir -p on the command line'''
+    """Creates a directory. equivalent to using mkdir -p on the command line"""
 
     from errno import EEXIST
     from os import makedirs, path
@@ -62,12 +62,12 @@ def annulus_plot():
     distance = np.sqrt((x - size // 2) ** 2 + (y - size // 2) ** 2)
     mask1 = np.where((0 <= distance) & (distance < 25), 0.5, 1)
     mask2 = np.where((25 <= distance) & (distance < 50), 0, 1)
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    ax.tick_params(labelsize=14)
-    ax.locator_params(axis='both', nbins=8)
-    ax.imshow(mask1 + mask2, cmap='Set1')
-    fig.savefig("../Bilder/Annulus.png", dpi=150, bbox_inches='tight', pad_inches=0.1)
+    fig_an = plt.figure()
+    ax_an = fig_an.add_subplot()
+    ax_an.tick_params(labelsize=14)
+    ax_an.locator_params(axis='both', nbins=8)
+    ax_an.imshow(mask1 + mask2, cmap='Set1')
+    fig_an.savefig("../Bilder/Annulus.png", dpi=150, bbox_inches='tight', pad_inches=0.1)
 
 
 def filter_plot():
@@ -98,6 +98,42 @@ def disk_plot():
     plt.xticks(fontsize=18)
 
 
+def aperture_photometrie():
+    print("----- 3d Background -----")
+    print(photometrie_poly(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img()[0]))
+    print(photometrie_poly(20, 39, cyc116_ghost2.get_pos(), cyc116.get_i_img()[0]))
+
+    print(photometrie(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img(), cyc116.get_r_img()))
+    print()
+
+    print("------- Aperture -------")
+    print("Big apperture ratios")
+    for observation in [cyc116, ND4, PointSpread]:
+        print(observation.name)
+        result = photometrie(416, 466, (512, 512), observation.get_i_img(), observation.get_r_img(),
+                             trans_filter=observation.filter_reduction)
+        print(result)
+        print()
+
+    circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
+
+    print("Mixed profile")
+
+    data_i = mixed_profiles[0] * circumference
+    data_r = mixed_profiles[1] * circumference
+    res_i = []
+    res_r = []
+
+    for rad_displ in np.arange(-1, 2):
+        res_i.append(np.sum(data_i[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_i[(416 + rad_displ):467]))
+        res_r.append(np.sum(data_r[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_r[(416 + rad_displ):467]))
+
+    print([np.mean(res_i), np.mean(res_r)], [np.std(res_i), np.std(res_r)])
+    print()
+
+    magnitude_wavelength_plot(HD100453_fluxes, (Rband_filter, Iband_filter))
+
+
 """ GUI """
 
 # StarGUI.start(cyc116)
@@ -106,23 +142,14 @@ def disk_plot():
 
 """ Plots """
 
-print("----- 3d Background -----")
+# annulus_plot()
+#
+# filter_plot()
+#
+# overview_plot()
+#
+# disk_plot()
 
-print(photometrie_poly(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img()[0]))
-print(photometrie_poly(20, 39, cyc116_ghost2.get_pos(), cyc116.get_i_img()[0]))
-
-print(photometrie(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img(), cyc116.get_r_img()))
-annulus_plot()
-
-filter_plot()
-
-overview_plot()
-
-disk_plot()
-
-plt.show()
-
-print()
 """ Fits """
 print("--------- Fitting ---------")
 start_int = 14
@@ -295,10 +322,24 @@ for index in [0, 1]:
 
 if save:
     print("File saved")
+    print()
     param_file.close()
+
+print("-------- Results --------")
+results = np.array(results)
+print(results)
+results_err = np.sqrt(np.abs(results_err))
+print("I/R: ", results[0] / results[1])
+print(2.5 * np.log10(results[0] / results[1]))
+error = (results_err[0] / results[1]) ** 2
+error += (results_err[1] * results[0] / results[1] ** 2) ** 2
+error = np.sqrt(error)
+print("Errors: ", error)
+print()
 
 """ comparison """
 print("--------- comparison ---------")
+print()
 cutoff = 80
 
 _, cyc116_i, _ = np.array(cyc116.azimuthal[0])
@@ -342,36 +383,9 @@ ax.fill_between([start_peak, end_peak], [0.9, 0.9], [1.1, 1.1], alpha=0.2, color
 if save:
     fig.savefig(path + "/Comparison2.png", dpi=150, bbox_inches='tight', pad_inches=0.1)
 
-print("-------- Results --------")
-results = np.array(results)
-print(results)
-results_err = np.sqrt(np.abs(results_err))
-print("I/R: ", results[0] / results[1])
-print(2.5 * np.log10(results[0] / results[1]))
-error = (results_err[0] / results[1]) ** 2
-error += (results_err[1] * results[0] / results[1] ** 2) ** 2
-error = np.sqrt(error)
-print("Errors: ", error)
-
 """ Aperture photometrie """
 
-BigBoy_app = aperture((1024, 1024), 512, 512, 416)
-print("------- Aperture -------")
-print("Big apperture ratios")
-for observation in [cyc116, ND4, PointSpread]:
-    print(observation.name)
-    result = photometrie(416,50,(512,512), observation.get_i_img(),observation.get_r_img())
-    print(result)
-    print()
-
-circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
-
-print("Mixed profile")
-result = [np.sum((mixed_profiles[0] * circumference)[:416]), np.sum((mixed_profiles[1] * circumference)[:416])]
-print(result)
-print()
-
-magnitude_wavelength_plot(HD100453_fluxes, (Rband_filter, Iband_filter))
+aperture_photometrie()
 
 """ Diffraction disk """
 

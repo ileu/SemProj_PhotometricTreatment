@@ -45,11 +45,17 @@ def magnitude_wavelength_plot(fix_points, x):
 
 
 def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np.ndarray, displ: int = 1,
-                scale: int = 1, poly: bool = False):
+                scale: int = 1, poly: bool = False, trans_filter=[1, 1]):
+    if irad > orad:
+        raise ValueError("The outer radius needs to be bigger than the inner radius")
+
     displacement_range = np.arange(-displ, displ + 1)
     radius_range = np.arange(-scale, scale + 1)
     shape = data_i[0].shape
     results = np.full((2 * displ + 1, 2 * displ + 1, 2 * scale + 1, 4), np.nan)
+
+    data_i = data_i / trans_filter[0]
+    data_r = data_r / trans_filter[1]
 
     for index_r, inner_range in np.ndenumerate(radius_range):
         for shift in itertools.product(displacement_range, repeat=2):
@@ -140,7 +146,7 @@ def photometrie_poly(irad, orad, pos, image):
     # ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
     # print(np.sum(img))
     result = img - fitted_val
-    return np.sum(result[mask_in]), np.sum(img[mask_in])
+    return np.sum(result[mask_in])
 
 
 def diffraction_rings(profile: np.ndarray, estimate: int, width: int = 6):
