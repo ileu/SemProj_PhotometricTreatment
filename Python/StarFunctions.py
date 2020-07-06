@@ -45,7 +45,7 @@ def magnitude_wavelength_plot(fix_points, x):
 
 
 def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np.ndarray, displ: int = 1,
-                scale: int = 1, poly: bool = False, trans_filter=[1, 1]):
+                scale: int = 1, poly: bool = False, trans_filter=[1, 1], res=False):
     if irad > orad:
         raise ValueError("The outer radius needs to be bigger than the inner radius")
 
@@ -61,13 +61,16 @@ def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np
         for shift in itertools.product(displacement_range, repeat=2):
             new_pos = tuple(map(sum, zip(pos, shift)))
             i_mask = aperture(shape, *new_pos, irad + inner_range)
-            o_mask = aperture(shape, *new_pos, orad, irad + inner_range)
+            o_mask = aperture(shape, *new_pos, orad + inner_range, irad + inner_range)
 
             flux_iq = np.sum(data_i[0][i_mask]) - np.sum(i_mask) * np.mean(data_i[0][o_mask])
             flux_rq = np.sum(data_r[0][i_mask]) - np.sum(i_mask) * np.mean(data_r[0][o_mask])
             flux_iu = np.sum(data_i[2][i_mask]) - np.sum(i_mask) * np.mean(data_i[2][o_mask])
             flux_ru = np.sum(data_r[2][i_mask]) - np.sum(i_mask) * np.mean(data_r[2][o_mask])
             results[shift[0] + displ, shift[1] + displ, index_r[0]] = [flux_iq, flux_iu, flux_rq, flux_ru]
+
+    if res:
+        return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2)), results
 
     return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2))
 
@@ -188,7 +191,7 @@ class StarImg:
         self.filter_reduction = [1, 1]
 
     def save(self):
-        print("Saving ",self.name)
+        print("Saving ", self.name)
         self.calc_radial_polarization()
         for index, img in enumerate(self.images):
             self.azimuthal.append(azimuthal_averaged_profile(img.data[0], err=True))
@@ -233,7 +236,7 @@ class StarImg:
     def add_object(self, obj: OOI):
         self.objects.append(obj)
 
-    def get_objects(self, text=True):
+    def get_objects(self, text=False):
         if text:
             out = "The following objects are marked in {}:".format(self.name)
             for obj in self.objects:

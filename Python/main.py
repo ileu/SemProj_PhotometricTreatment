@@ -1,6 +1,8 @@
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.stats import f_oneway
 from StarData import cyc116, ND4, PointSpread, cyc116_second_star, cyc116_ghost2, ND4_filter_data, HD100453_fluxes, \
     Rband_filter, Iband_filter
 from datetime import datetime
@@ -99,21 +101,14 @@ def disk_plot():
 
 
 def aperture_photometrie():
-    print("----- 3d Background -----")
-    print(photometrie_poly(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img()[0]))
-    print(photometrie_poly(20, 39, cyc116_ghost2.get_pos(), cyc116.get_i_img()[0]))
-
-    print(photometrie(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img(), cyc116.get_r_img()))
-    print()
-
     print("------- Aperture -------")
-    print("Big aperture ratios")
+    print("Big aperture")
     for observation in [cyc116, ND4, PointSpread]:
         print(observation.name)
         result = photometrie(416, 466, (512, 512), observation.get_i_img(), observation.get_r_img(),
                              trans_filter=observation.filter_reduction)
         print(result)
-        print(result[1]/result[0])
+        print(result[1] / result[0])
         print()
 
     circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
@@ -135,11 +130,44 @@ def aperture_photometrie():
         res_rq.append(np.sum(data_rq[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_rq[(416 + rad_displ):467]))
         res_ru.append(np.sum(data_ru[:(416 + rad_displ)]) - (416 + rad_displ) * np.mean(data_ru[(416 + rad_displ):467]))
 
-    print([np.mean(res_iq), np.mean(res_rq)], [np.std(res_iq)/np.mean(res_iq), np.std(res_rq)/np.mean(res_rq)])
-    print([np.mean(res_iu), np.mean(res_ru)], [np.std(res_iu)/np.mean(res_iu), np.std(res_ru)/np.mean(res_ru)])
+    print([np.mean(res_iq), np.mean(res_rq)], [np.std(res_iq) / np.mean(res_iq), np.std(res_rq) / np.mean(res_rq)])
+    print([np.mean(res_iu), np.mean(res_ru)], [np.std(res_iu) / np.mean(res_iu), np.std(res_ru) / np.mean(res_ru)])
     print()
 
     magnitude_wavelength_plot(HD100453_fluxes, (Rband_filter, Iband_filter))
+
+    print("small aperture")
+    results_small = []
+    print("cyc116")
+    print()
+    for obj in cyc116.get_objects():
+        results_small.append(photometrie(20, 39, obj.get_pos(), cyc116.get_i_img(), cyc116.get_r_img(), scale=3))
+        print(obj.name)
+        print(results_small[-1])
+        print(results_small[-1][1] / results_small[-1][0])
+        print()
+
+    print("----- 3d Background -----")
+    radius_range = np.arange(-3, 4)
+
+    results_3d_sec = []
+    results_3d_g2 = []
+    for inner_range in radius_range:
+        results_3d_sec.append(photometrie_poly(20, 39 + inner_range, cyc116_second_star.get_pos(),
+                                               cyc116.get_i_img()[0]))
+        results_3d_g2.append(photometrie_poly(20, 39 + inner_range, cyc116_ghost2.get_pos(), cyc116.get_i_img()[0]))
+
+    results_sec = photometrie(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img(), cyc116.get_r_img(), displ=0,
+                              scale=3)
+    results_g2 = photometrie(20, 39, cyc116_ghost2.get_pos(), cyc116.get_i_img(), cyc116.get_r_img(), displ=0, scale=3)
+
+    print("Companion")
+    print(np.mean(results_3d_sec), np.std(results_3d_sec))
+    print(results_sec)
+    print("Ghost 2")
+    print(np.mean(results_3d_g2), np.std(results_3d_g2))
+    print(results_g2)
+    print()
 
 
 """ GUI """
@@ -263,7 +291,7 @@ for index, _ in enumerate(profile):
     ax.plot(radi, star_profile, '-DC2', label="star profile", markevery=markers_on_psf)
     psf_equation = R"$({:.2})\cdot(gauss(PSF,{:.2})-({:.2}))$".format(*psf_factor[0])
     ax.plot([], [], ' ', label=psf_equation)
-    ax.legend(fontsize='large', framealpha=1)
+    ax.legend(fontsize='large', framealpha=1, loc=4)
     ax.set_yscale('log', nonposy='clip')
     ax.set_ylim(ymin=y_min)
 
@@ -297,7 +325,7 @@ for index, _ in enumerate(profile):
     lines = [line1, line2, line3]
     align_yaxis(ax, 0, ax1, 0)
     ax.fill_between([32, 118], [-110, -110], [1000, 1000], alpha=0.2, color="gold")
-    ax.legend(lines, [line.get_label() for line in lines], fontsize='x-large', framealpha=1)
+    ax.legend(lines, [line.get_label() for line in lines], fontsize='x-large', framealpha=1, loc=1)
 
     if save:
         fig_comp.savefig(path + "/Profiles_" + profile[index] + ".png", dpi=150, bbox_inches='tight', pad_inches=0.1)
