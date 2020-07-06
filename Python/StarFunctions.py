@@ -75,27 +75,18 @@ def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np
     return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2))
 
 
-def azimuthal_averaged_profile(image: np.ndarray, err=False):
+def azimuthal_averaged_profile(image: np.ndarray):
     size = image[0].size
     shape = image.shape
     radius = size // 2
     img = image.copy()
     profile = []
-    error = []
     for r in range(0, radius):
         mask = aperture(shape, size // 2, size // 2, r + 1)
 
         profile.append(np.nanmean(img[mask]))
-        n = np.nansum(mask) - np.count_nonzero(np.isnan(img))
-        if n != 0:
-            error.append(np.sqrt(np.abs(np.nansum(img[mask]))) / n)
-        else:
-            error.append(0)
 
         img[mask] = np.nan
-
-    if err:
-        return np.arange(0, radius), np.array(profile), np.array(error)
 
     return np.arange(0, radius), np.array(profile)
 
@@ -194,9 +185,9 @@ class StarImg:
         print("Saving ", self.name)
         self.calc_radial_polarization()
         for index, img in enumerate(self.images):
-            self.azimuthal.append(azimuthal_averaged_profile(img.data[0], err=True))
-            self.azimuthal.append(azimuthal_averaged_profile(img.data[2], err=True))
-            self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index][0], err=True))
+            self.azimuthal.append(azimuthal_averaged_profile(img.data[0]))
+            self.azimuthal.append(azimuthal_averaged_profile(img.data[2]))
+            self.azimuthal_qphi.append(azimuthal_averaged_profile(self.radial[index][0]))
 
         save = [np.array(self.radial), self.azimuthal, self.azimuthal_qphi]
 
@@ -274,7 +265,7 @@ class StarImg:
 
         return mask, np.array(total_counts), np.array(wo_bg_counts), np.array(background_avgs)
 
-    def mark_objects(self, inner_radius, outer_radius, err=False, alpha=0.125):
+    def mark_objects(self, inner_radius, outer_radius, alpha=0.125):
         img_i = self.images[0].data[0, :, :].copy()
         img_r = self.images[1].data[0, :, :].copy()
 
@@ -284,7 +275,6 @@ class StarImg:
         total_counts = []
         wo_bg_counts = []
         background_avgs = []
-        error = []
 
         mask = np.zeros(shape)
         alphas = np.zeros(shape)
@@ -301,13 +291,7 @@ class StarImg:
             mask += 0.5 * mask_in + mask_out
             alphas += alpha * (mask_in + mask_out)
 
-            if err:
-                error.append(np.sqrt(np.abs(total_counts[-1])))
-
         mask = cmap(mask)
         mask[..., -1] = alphas
-
-        if err:
-            return mask, np.array(total_counts), np.array(wo_bg_counts), np.array(background_avgs), np.array(error)
 
         return mask, np.array(total_counts), np.array(wo_bg_counts), np.array(background_avgs)

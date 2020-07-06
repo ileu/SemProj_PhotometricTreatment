@@ -75,19 +75,13 @@ def start(star_data: StarImg):
         star_mask, total_counts, bg_counts, bg_avgs = star_data.mark_objects(rinner, router)
 
         for index, text in enumerate(textaxes):
-            # print(obj.name)
-            # print(err)
             ratio = bg_counts[index][0] / bg_counts[index][1]
-            # ratio_err = (err[index][0] / bg_counts[index][1]) ** 2
-            # ratio_err += (err[index][1] * bg_counts[index][0] / bg_counts[index][1] ** 2) ** 2
-            # ratio_err = np.sqrt(ratio_err)
 
             if ratio > 0:
                 magnitude = 2.5 * np.log10(ratio)
             else:
                 magnitude = np.nan
 
-            # print(ratio_err)
             text[2].set_text("Total Count:  {:.4}   {:.4}".format(*total_counts[index]))
             text[3].set_text("Average BG:  {:.4}   {:.4}".format(*bg_avgs[index]))
             text[4].set_text("Counts wo BG:  {:.4}   {:.4}".format(*bg_counts[index]))

@@ -209,7 +209,6 @@ save = False
 smart = False
 
 results = []
-results_err = []
 scal_profiles = []
 mixed_profiles = []
 star_profiles = []
@@ -226,12 +225,12 @@ if save:
 for index, _ in enumerate(profile):
     print(profile[index])
     # cyc116_img = cyc116.get_i_img()[0]
-    radi, cyc116_profile, cyc116_err = cyc116.azimuthal[index]
-    _, nd4_profile, nd4_err = ND4.azimuthal[index]
+    radi, cyc116_profile = cyc116.azimuthal[index]
+    _, nd4_profile = ND4.azimuthal[index]
 
-    _, psf_profile, psf_err = PointSpread.azimuthal[index]
+    _, psf_profile = PointSpread.azimuthal[index]
 
-    x2, qphi, qphi_err = cyc116.azimuthal_qphi[index // 2]
+    x2, qphi = cyc116.azimuthal_qphi[index // 2]
 
     guess = (1.0 / ND4.filter_reduction[index // 2], np.median(nd4_profile[100:]))
     print("guess: ", guess)
@@ -242,10 +241,6 @@ for index, _ in enumerate(profile):
 
     scaled_profile = scaling_func(nd4_profile, *scaling_factor[0])
     scal_profiles.append(scaled_profile)
-
-    scaled_profile_err = scaling_factor[0][0] ** 2 * scaling_factor[1][1, 1]
-    scaled_profile_err += (nd4_profile - scaling_factor[0][1]) ** 2 * scaling_factor[1][0, 0]
-    scaled_profile_err = np.sqrt(scaled_profile_err)
 
     mixed_profile = cyc116_profile.copy()
     mixed_profile[:transition] = scaled_profile[:transition]
@@ -268,14 +263,7 @@ for index, _ in enumerate(profile):
     star_profile = scaling_gauss_func(psf_profile, *psf_factor[0])
     star_profiles.append(star_profile)
 
-    star_profile_err = psf_factor[0][0] ** 2 * psf_factor[1][1, 1]
-    star_profile_err += (nd4_profile - psf_factor[0][1]) ** 2 * psf_factor[1][0, 0]
-    star_profile_err = np.sqrt(star_profile_err)
-
     disk_profile = mixed_profile - star_profile
-    disk_profile_err = star_profile_err ** 2
-    disk_profile_err += cyc116_err ** 2
-    disk_profile_err = np.sqrt(disk_profile_err)
 
     fig_comp = plt.figure(figsize=(14, 7), num="Profiles " + profile[index])
     textax = plt.axes([0.5, 0.9, 0.3, 0.03], figure=fig_comp)
@@ -346,14 +334,9 @@ for index, _ in enumerate(profile):
     disk_profile[disk_profile < 0] = 0
     results.append([np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32), np.sum(qphi[24:118]),
                     np.sum(star_profile[:20]) - np.mean(star_profile[20:40]) * 20])
-    results_err.append(
-        [np.sum(disk_profile_err[32:118] ** 2) - np.std(disk_profile[130:]) ** 2 * (118 - 32),
-         np.sum(qphi_err[24:118] ** 2),
-         np.sum(star_profile_err[:22] ** 2) - np.std(cyc116_profile[130:]) ** 2 * 22])
     print("Counts fit: ", np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32))
     print("Qphi counts: ", np.sum(qphi[24:118]))
     print("PSF counts: ", np.sum(star_profile[:22]) - np.median(cyc116_profile[130:]) * 22)
-    print("errors: ", results_err)
     print()
 
 if save:
@@ -364,13 +347,8 @@ if save:
 print("-------- Results --------")
 results = np.array(results)
 print(results)
-results_err = np.sqrt(np.abs(results_err))
 print("I/R: ", results[0] / results[1])
 print(2.5 * np.log10(results[0] / results[1]))
-error = (results_err[0] / results[1]) ** 2
-error += (results_err[1] * results[0] / results[1] ** 2) ** 2
-error = np.sqrt(error)
-print("Errors: ", error)
 print()
 
 """ comparison """
@@ -378,8 +356,8 @@ print("--------- comparison ---------")
 print()
 cutoff = 80
 
-_, cyc116_i, _ = np.array(cyc116.azimuthal[0])
-_, cyc116_r, _ = np.array(cyc116.azimuthal[1])
+_, cyc116_i = np.array(cyc116.azimuthal[0])
+_, cyc116_r = np.array(cyc116.azimuthal[1])
 
 comp_nd4_i = cyc116_i / scal_profiles[0]
 comp_nd4_r = cyc116_r / scal_profiles[1]
