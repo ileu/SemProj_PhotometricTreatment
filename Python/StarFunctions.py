@@ -45,34 +45,77 @@ def magnitude_wavelength_plot(fix_points, x):
 
 
 def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np.ndarray, displ: int = 1,
-                scale: int = 1, poly: bool = False, trans_filter=[1, 1], res=False):
+                scale: int = 1, trans_filter=None, res=False):
+
+    if trans_filter is None:
+        trans_filter = [1, 1]
+
     if irad > orad:
         raise ValueError("The outer radius needs to be bigger than the inner radius")
 
     displacement_range = np.arange(-displ, displ + 1)
     radius_range = np.arange(-scale, scale + 1)
     shape = data_i[0].shape
-    results = np.full((2 * displ + 1, 2 * displ + 1, 2 * scale + 1, 4), np.nan)
+    results = np.full((2 * displ + 1, 2 * displ + 1, 2 * scale + 1, 2 * scale + 1, 4), np.nan)
 
     data_i = data_i / trans_filter[0]
     data_r = data_r / trans_filter[1]
 
-    for index_r, inner_range in np.ndenumerate(radius_range):
-        for shift in itertools.product(displacement_range, repeat=2):
-            new_pos = tuple(map(sum, zip(pos, shift)))
-            i_mask = aperture(shape, *new_pos, irad + inner_range)
-            o_mask = aperture(shape, *new_pos, orad + inner_range, irad + inner_range)
-
-            flux_iq = np.sum(data_i[0][i_mask]) - np.sum(i_mask) * np.mean(data_i[0][o_mask])
-            flux_rq = np.sum(data_r[0][i_mask]) - np.sum(i_mask) * np.mean(data_r[0][o_mask])
-            flux_iu = np.sum(data_i[2][i_mask]) - np.sum(i_mask) * np.mean(data_i[2][o_mask])
-            flux_ru = np.sum(data_r[2][i_mask]) - np.sum(i_mask) * np.mean(data_r[2][o_mask])
-            results[shift[0] + displ, shift[1] + displ, index_r[0]] = [flux_iq, flux_iu, flux_rq, flux_ru]
+    for index_ir, inner_range in np.ndenumerate(radius_range):
+        for index_or, outer_range in np.ndenumerate(radius_range):
+            for shift in itertools.product(displacement_range, repeat=2):
+                new_pos = tuple(map(sum, zip(pos, shift)))
+                i_mask = aperture(shape, *new_pos, irad + inner_range)
+                o_mask = aperture(shape, *new_pos, orad + outer_range, irad + inner_range)
+                med1 = np.median(data_i[0][o_mask])
+                med2 = np.median(data_i[2][o_mask])
+                med3 = np.median(data_r[0][o_mask])
+                med4 = np.median(data_r[2][o_mask])
+                sum1 = np.sum(data_i[0][i_mask])
+                sum2 = np.sum(data_i[2][i_mask])
+                sum3 = np.sum(data_r[0][i_mask])
+                sum4 = np.sum(data_r[2][i_mask])
+                n = np.sum(i_mask)
+                flux_iq = np.sum(data_i[0][i_mask]) - np.sum(i_mask) * np.median(data_i[0][o_mask])
+                flux_rq = np.sum(data_r[0][i_mask]) - np.sum(i_mask) * np.median(data_r[0][o_mask])
+                flux_iu = np.sum(data_i[2][i_mask]) - np.sum(i_mask) * np.median(data_i[2][o_mask])
+                flux_ru = np.sum(data_r[2][i_mask]) - np.sum(i_mask) * np.median(data_r[2][o_mask])
+                results[shift[0] + displ, shift[1] + displ, index_ir[0], index_or[0]] = [flux_iq, flux_iu, flux_rq,
+                                                                                         flux_ru]
 
     if res:
         return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2)), results
 
     return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2))
+
+
+def photometrie_disk(hole: int, irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np.ndarray,
+                     displ: int = 1, scale: int = 1, res=False):
+    if irad > orad or hole > irad:
+        raise ValueError("One radius is wrong")
+
+    displacement_range = np.arange(-displ, displ + 1)
+    radius_range = np.arange(-scale, scale + 1)
+    shape = data_i.shape
+    results = np.full((2 * displ + 1, 2 * displ + 1, 2 * scale + 1, 2 * scale + 1, 2 * scale + 1, 2), np.nan)
+
+    for index_h, hole_range in np.ndenumerate(radius_range):
+        for index_ir, inner_range in np.ndenumerate(radius_range):
+            for index_or, outer_range in np.ndenumerate(radius_range):
+                for shift in itertools.product(displacement_range, repeat=2):
+                    new_pos = tuple(map(sum, zip(pos, shift)))
+                    i_mask = aperture(shape, *new_pos, irad + inner_range, hole + hole_range)
+                    o_mask = aperture(shape, *new_pos, orad + outer_range, irad + inner_range)
+
+                    flux_i = np.sum(data_i[i_mask]) - np.sum(i_mask) * np.median(data_i[o_mask])
+                    flux_r = np.sum(data_r[i_mask]) - np.sum(i_mask) * np.median(data_r[o_mask])
+
+                    results[shift[0] + displ, shift[1] + displ, index_h[0], index_ir[0], index_or[0]] = [flux_i, flux_r]
+
+    if res:
+        return np.nanmean(results, axis=(0, 1, 2, 3, 4)), np.nanstd(results, axis=(0, 1, 2, 3, 4)), results
+
+    return np.nanmean(results, axis=(0, 1, 2, 3, 4)), np.nanstd(results, axis=(0, 1, 2, 3, 4))
 
 
 def azimuthal_averaged_profile(image: np.ndarray):
@@ -141,20 +184,6 @@ def photometrie_poly(irad, orad, pos, image):
     # print(np.sum(img))
     result = img - fitted_val
     return np.sum(result[mask_in])
-
-
-def diffraction_rings(profile: np.ndarray, estimate: int, width: int = 6):
-    size = len(profile)
-    first_deriv = np.gradient(profile)
-    second_deriv = np.gradient(first_deriv)
-    estimates = np.arange(estimate - width, estimate + width)
-    sec_deriv_func = interpolate.interp1d(np.arange(0, size), second_deriv)
-
-    def sec_deriv_sq(x):
-        return sec_deriv_func(x) ** 2
-
-    zeros = least_squares(sec_deriv_sq, estimates, bounds=(1, estimate + width))
-    return zeros.x, sec_deriv_sq(zeros.x)
 
 
 class OOI:
@@ -253,9 +282,9 @@ class StarImg:
         mask2 = aperture(shape, *self.disk.get_pos(), outer_radius, middle_radius)
 
         total_counts = [np.sum(radial_i[mask1]), np.sum(radial_r[mask1])]
-        background_avgs = [np.mean(radial_i[mask2]), np.mean(radial_r[mask2])]
-        wo_bg_counts = [total_counts[0] - background_avgs[0] * obj_pixel,
-                        total_counts[1] - background_avgs[1] * obj_pixel]
+        background_med = [np.median(radial_i[mask2]), np.median(radial_r[mask2])]
+        wo_bg_counts = [total_counts[0] - background_med[0] * obj_pixel,
+                        total_counts[1] - background_med[1] * obj_pixel]
 
         mask = 0.5 * mask1 + mask2
         alphas = alpha * (mask1 + mask2)
@@ -263,7 +292,7 @@ class StarImg:
         mask = cmap(mask)
         mask[..., -1] = alphas
 
-        return mask, np.array(total_counts), np.array(wo_bg_counts), np.array(background_avgs)
+        return mask, np.array(total_counts), np.array(wo_bg_counts), np.array(background_med)
 
     def mark_objects(self, inner_radius, outer_radius, alpha=0.125):
         img_i = self.images[0].data[0, :, :].copy()
@@ -284,7 +313,7 @@ class StarImg:
             mask_out = aperture(shape, *obj.get_pos(), outer_radius, inner_radius)
 
             total_counts.append([np.sum(img_i[mask_in]), np.sum(img_r[mask_in])])
-            background_avgs.append([np.mean(img_i[mask_out]), np.mean(img_r[mask_out])])
+            background_avgs.append([np.median(img_i[mask_out]), np.median(img_r[mask_out])])
             wo_bg_counts.append([total_counts[-1][0] - background_avgs[-1][0] * np.sum(mask_in),
                                  total_counts[-1][1] - background_avgs[-1][1] * np.sum(mask_in)])
 

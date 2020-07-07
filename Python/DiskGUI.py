@@ -18,13 +18,28 @@ def start(star_data: StarImg):
     router = or0
     pixel = 1.0
     axcolor = 'lavender'
+    hidden = False
 
     disk_map = star_data.radial[0][0]
+    disk_mask = disk_map.copy()
+    navigation_map = disk_map.copy()
 
     # GUI setup
     fig, ax = plt.subplots(figsize=(18, 11))
 
     ax.tick_params(labelsize=18)
+    numrows, numcols = disk_map.shape
+
+    def format_coord(x, y):
+        col = int(x + 0.5)
+        row = int(y + 0.5)
+        if 0 <= col < numcols and 0 <= row < numrows:
+            z = navigation_map[row, col]
+            return 'x={:.0f}, y={:.0f}, z={:.3}'.format(x, y, z)
+        else:
+            return 'x={:.0}, y={:.0}'.format(x, y)
+
+    ax.format_coord = format_coord
 
     axinner = plt.axes([0.6, 0.85, 0.35, 0.03], facecolor=axcolor)
     axmiddle = plt.axes([0.6, 0.8, 0.35, 0.03], facecolor=axcolor)
@@ -42,6 +57,9 @@ def start(star_data: StarImg):
 
     resetax = plt.axes([0.85, 0.11, 0.08, 0.04])
     button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+
+    hidax = plt.axes([0.75, 0.11, 0.08, 0.04])
+    hidbutton = Button(hidax, 'Hide Mask', color=axcolor, hovercolor='0.975')
 
     textax = plt.axes([0.6, 0.5, 0.3, 0.03])
     textax.axis('off')
@@ -71,8 +89,18 @@ def start(star_data: StarImg):
         souter.reset()
         fig.canvas.draw_idle()
 
+    def hide(event):
+        nonlocal hidden
+        if hidden:
+            disk_mask_plot.set_data(disk_mask)
+        else:
+            disk_mask_plot.set_data(np.zeros_like(disk_mask))
+
+        hidden = not hidden
+        fig.canvas.draw_idle()
+
     def update(val=None):
-        nonlocal rinner, rmiddle, router
+        nonlocal rinner, rmiddle, router, disk_mask
         rinner = sinner.val
         rmiddle = smiddle.val
         router = souter.val
@@ -114,6 +142,7 @@ def start(star_data: StarImg):
     souter.on_changed(update)
 
     button.on_clicked(reset)
+    hidbutton.on_clicked(hide)
 
     radio.on_clicked(change_band)
 
