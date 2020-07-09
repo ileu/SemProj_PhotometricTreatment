@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from typing import List
 import itertools
-from scipy.optimize import curve_fit, least_squares
-from scipy import interpolate
+from scipy.optimize import curve_fit
+from scipy.stats import sigmaclip
 import numpy as np
 import pickle
 import os
@@ -46,7 +46,6 @@ def magnitude_wavelength_plot(fix_points, x):
 
 def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np.ndarray, displ: int = 1,
                 scale: int = 1, trans_filter=None, res=False):
-
     if trans_filter is None:
         trans_filter = [1, 1]
 
@@ -67,30 +66,23 @@ def photometrie(irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np
                 new_pos = tuple(map(sum, zip(pos, shift)))
                 i_mask = aperture(shape, *new_pos, irad + inner_range)
                 o_mask = aperture(shape, *new_pos, orad + outer_range, irad + inner_range)
-                med1 = np.median(data_i[0][o_mask])
-                med2 = np.median(data_i[2][o_mask])
-                med3 = np.median(data_r[0][o_mask])
-                med4 = np.median(data_r[2][o_mask])
-                sum1 = np.sum(data_i[0][i_mask])
-                sum2 = np.sum(data_i[2][i_mask])
-                sum3 = np.sum(data_r[0][i_mask])
-                sum4 = np.sum(data_r[2][i_mask])
-                n = np.sum(i_mask)
-                flux_iq = np.sum(data_i[0][i_mask]) - np.sum(i_mask) * np.median(data_i[0][o_mask])
-                flux_rq = np.sum(data_r[0][i_mask]) - np.sum(i_mask) * np.median(data_r[0][o_mask])
-                flux_iu = np.sum(data_i[2][i_mask]) - np.sum(i_mask) * np.median(data_i[2][o_mask])
-                flux_ru = np.sum(data_r[2][i_mask]) - np.sum(i_mask) * np.median(data_r[2][o_mask])
+                # np.median(sigmaclip(data_[i][o_mask])[0])
+                flux_iq = np.sum(data_i[0][i_mask]) - np.sum(i_mask) * np.median(sigmaclip(data_i[0][o_mask])[0])
+                flux_rq = np.sum(data_r[0][i_mask]) - np.sum(i_mask) * np.median(sigmaclip(data_r[0][o_mask])[0])
+                flux_iu = np.sum(data_i[2][i_mask]) - np.sum(i_mask) * np.median(sigmaclip(data_i[2][o_mask])[0])
+                flux_ru = np.sum(data_r[2][i_mask]) - np.sum(i_mask) * np.median(sigmaclip(data_r[2][o_mask])[0])
+
                 results[shift[0] + displ, shift[1] + displ, index_ir[0], index_or[0]] = [flux_iq, flux_iu, flux_rq,
                                                                                          flux_ru]
 
     if res:
-        return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2)), results
+        return np.nanmean(results, axis=(0, 1, 2, 3)), np.nanstd(results, axis=(0, 1, 2, 3)), results
 
-    return np.nanmean(results, axis=(0, 1, 2)), np.nanstd(results, axis=(0, 1, 2))
+    return np.nanmean(results, axis=(0, 1, 2, 3)), np.nanstd(results, axis=(0, 1, 2, 3))
 
 
 def photometrie_disk(hole: int, irad: int, orad: int, pos: tuple, data_i: np.ndarray, data_r: np.ndarray,
-                     displ: int = 1, scale: int = 1, res=False):
+                     displ: int = 1, scale: int = 1, res=False, bg=False):
     if irad > orad or hole > irad:
         raise ValueError("One radius is wrong")
 
@@ -98,6 +90,7 @@ def photometrie_disk(hole: int, irad: int, orad: int, pos: tuple, data_i: np.nda
     radius_range = np.arange(-scale, scale + 1)
     shape = data_i.shape
     results = np.full((2 * displ + 1, 2 * displ + 1, 2 * scale + 1, 2 * scale + 1, 2 * scale + 1, 2), np.nan)
+    bgs = results.copy()
 
     for index_h, hole_range in np.ndenumerate(radius_range):
         for index_ir, inner_range in np.ndenumerate(radius_range):
@@ -109,11 +102,15 @@ def photometrie_disk(hole: int, irad: int, orad: int, pos: tuple, data_i: np.nda
 
                     flux_i = np.sum(data_i[i_mask]) - np.sum(i_mask) * np.median(data_i[o_mask])
                     flux_r = np.sum(data_r[i_mask]) - np.sum(i_mask) * np.median(data_r[o_mask])
-
+                    bgs[shift[0] + displ, shift[1] + displ, index_h[0], index_ir[0], index_or[0]] = [
+                        np.median(data_i[o_mask]), np.median(data_r[o_mask])]
                     results[shift[0] + displ, shift[1] + displ, index_h[0], index_ir[0], index_or[0]] = [flux_i, flux_r]
 
     if res:
         return np.nanmean(results, axis=(0, 1, 2, 3, 4)), np.nanstd(results, axis=(0, 1, 2, 3, 4)), results
+    elif bg:
+        return np.nanmean(results, axis=(0, 1, 2, 3, 4)), np.nanstd(results, axis=(0, 1, 2, 3, 4)), \
+               np.nanmean(bgs, axis=(0, 1, 2, 3, 4))
 
     return np.nanmean(results, axis=(0, 1, 2, 3, 4)), np.nanstd(results, axis=(0, 1, 2, 3, 4))
 
@@ -161,27 +158,9 @@ def photometrie_poly(irad, orad, pos, image):
 
     mask = np.array(mask)
     fit = curve_fit(poly_sec_ord, mask[:, :2], mask[:, 2])
-    # """ background removal """
-    #
-    # fig = plt.figure(figsize=(24, 10), num=self.name + " background removal")
-    # fig.suptitle(self.name + " background removal")
-    #
-    # ax = fig.add_subplot(1, 2, 1, projection='3d')
-    # ax.scatter(mesh[:, 0], mesh[:, 1], img, c=color)
-    # # ax.plot_surface(*mesh_grid, img)
-    #
-    # ax = fig.add_subplot(1, 2, 2, projection='3d')
-    # ax.scatter(mask[:, 0], mask[:, 1], mask[:, 2])
-    # ax.scatter(mesh[:, 0], mesh[:, 1], fitted_val, c=color, alpha=0.4)
-    """ Image without background """
 
     fitted_val = poly_sec_ord(mesh, *fit[0]).reshape(img.shape)
 
-    # fig = plt.figure(figsize=(8, 8), num=self.name + " final")
-    # fig.suptitle(self.name + " without background")
-    # ax = fig.add_subplot(1, 1, 1, projection='3d')
-    # ax.scatter(mesh[:, 0], mesh[:, 1], img - fitted_val)
-    # print(np.sum(img))
     result = img - fitted_val
     return np.sum(result[mask_in])
 
@@ -226,7 +205,7 @@ class StarImg:
     def load(self):
         [self.radial, self.azimuthal, self.azimuthal_qphi] = pickle.load(
             open(full_file_path + "/../Data/" + self.name + "_save.p", "rb"))
-        print("File loaded")
+        print(self.name, " loaded")
 
     def get_i_img(self):
         return self.images[0].data

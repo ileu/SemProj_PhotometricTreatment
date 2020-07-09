@@ -1,8 +1,7 @@
-import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.stats import f_oneway
+from scipy.stats import sigmaclip
 from StarData import cyc116, ND4, PointSpread, cyc116_second_star, cyc116_ghost2, ND4_filter_data, HD100453_fluxes, \
     Rband_filter, Iband_filter
 from datetime import datetime
@@ -78,10 +77,10 @@ def filter_plot():
     ax_filter.semilogy(ND4_filter_data[:, 0], ND4_filter_data[:, 3], label="ND4")
     ax_filter.set_xlabel("wavelength [nm]", fontsize=16)
     ax_filter.set_ylabel("transmission", fontsize=16)
-    ax_filter.set_yticks([1e-3, 1e-4, 1e-5])
+    # ax_filter.set_yticks([1e-3, 1e-4, 1e-5])
     ax_filter.tick_params(labelsize=14)
     ax_filter.legend(fontsize="large")
-    ax_filter.grid(which="minor")
+    ax_filter.grid(which="both", alpha=0.25, zorder=-2, c='k')
     fig_filter.savefig("../Bilder/nd4_filter.png", dpi=150, bbox_inches='tight', pad_inches=0.1)
 
 
@@ -104,14 +103,55 @@ def disk_plot():
 def aperture_photometrie():
     print("------- Aperture -------")
     print("Big aperture")
+    results_big = []
     for observation in [cyc116, ND4, PointSpread]:
         print(observation.name)
         result = photometrie(416, 466, (512, 512), observation.get_i_img(), observation.get_r_img())
+        results_big.append(result)
         print(result)
         print(result[1] / result[0])
         print()
 
-    circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
+    # print("rescaled PSF")
+    #
+    # data_iq = scal_profiles[0] * circumference
+    # data_iu = scal_profiles[1] * circumference
+    # data_rq = scal_profiles[2] * circumference
+    # data_ru = scal_profiles[3] * circumference
+    # res_scal_iq = []
+    # res_scal_iu = []
+    # res_scal_rq = []
+    # res_scal_ru = []
+    # res_scal_small_iq = []
+    # res_scal_small_iu = []
+    # res_scal_small_rq = []
+    # res_scal_small_ru = []
+    # for rad_displ in np.arange(-1, 2):
+    #     res_scal_iq.append(np.sum(data_iq[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+    #                        np.median(sigmaclip(scal_profiles[0][(416 + rad_displ):467])[0]))
+    #     res_scal_iu.append(np.sum(data_iu[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+    #                        np.median(sigmaclip(scal_profiles[1][(416 + rad_displ):467])[0]))
+    #     res_scal_rq.append(np.sum(data_rq[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+    #                        np.median(sigmaclip(scal_profiles[2][(416 + rad_displ):467])[0]))
+    #     res_scal_ru.append(np.sum(data_ru[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+    #                        np.median(sigmaclip(scal_profiles[3][(416 + rad_displ):467])[0]))
+    #
+    #     res_scal_small_iq.append(np.sum(data_iq[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+    #                              np.median(sigmaclip(scal_profiles[0][(20 + rad_displ):40])[0]))
+    #     res_scal_small_iu.append(np.sum(data_iu[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+    #                              np.median(sigmaclip(scal_profiles[1][(20 + rad_displ):40])[0]))
+    #     res_scal_small_rq.append(np.sum(data_rq[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+    #                              np.median(sigmaclip(scal_profiles[2][(20 + rad_displ):40])[0]))
+    #     res_scal_small_ru.append(np.sum(data_ru[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+    #                              np.median(sigmaclip(scal_profiles[3][(20 + rad_displ):40])[0]))
+    #
+    # print([np.mean(res_scal_iq), np.mean(res_scal_rq)], [np.std(res_scal_iq) / np.mean(res_scal_iq),
+    #                                                      np.std(res_scal_rq) / np.mean(res_scal_rq)])
+    # print([np.mean(res_scal_iu), np.mean(res_scal_ru)], [np.std(res_scal_iu) / np.mean(res_scal_iu),
+    #                                                      np.std(res_scal_ru) / np.mean(res_scal_ru)])
+    # results_big_scaled = np.array([np.mean(res_scal_iq), np.mean(res_scal_rq),
+    #                                np.mean(res_scal_iu), np.mean(res_scal_ru)])
+    # print()
 
     print("Mixed profile")
 
@@ -128,26 +168,27 @@ def aperture_photometrie():
     res_small_rq = []
     res_small_ru = []
     for rad_displ in np.arange(-1, 2):
-        res_iq.append(np.sum(data_iq[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) * np.median(
-            mixed_profiles[0][(416 + rad_displ):467]))
-        res_iu.append(np.sum(data_iu[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) * np.median(
-            mixed_profiles[1][(416 + rad_displ):467]))
-        res_rq.append(np.sum(data_rq[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) * np.median(
-            mixed_profiles[2][(416 + rad_displ):467]))
-        res_ru.append(np.sum(data_ru[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) * np.median(
-            mixed_profiles[3][(416 + rad_displ):467]))
+        res_iq.append(np.sum(data_iq[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+                      np.median(sigmaclip(mixed_profiles[0][(416 + rad_displ):467])[0]))
+        res_iu.append(np.sum(data_iu[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+                      np.median(sigmaclip(mixed_profiles[1][(416 + rad_displ):467])[0]))
+        res_rq.append(np.sum(data_rq[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+                      np.median(sigmaclip(mixed_profiles[2][(416 + rad_displ):467])[0]))
+        res_ru.append(np.sum(data_ru[:(416 + rad_displ)]) - np.sum(circumference[:(416 + rad_displ)]) *
+                      np.median(sigmaclip(mixed_profiles[3][(416 + rad_displ):467])[0]))
 
-        res_small_iq.append(np.sum(data_iq[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) * np.median(
-            mixed_profiles[0][(20 + rad_displ):40]))
-        res_small_iu.append(np.sum(data_iu[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) * np.median(
-            mixed_profiles[1][(20 + rad_displ):40]))
-        res_small_rq.append(np.sum(data_rq[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) * np.median(
-            mixed_profiles[2][(20 + rad_displ):40]))
-        res_small_ru.append(np.sum(data_ru[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) * np.median(
-            mixed_profiles[3][(20 + rad_displ):40]))
+        res_small_iq.append(np.sum(data_iq[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+                            np.median(sigmaclip(mixed_profiles[0][(20 + rad_displ):40])[0]))
+        res_small_iu.append(np.sum(data_iu[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+                            np.median(sigmaclip(mixed_profiles[1][(20 + rad_displ):40])[0]))
+        res_small_rq.append(np.sum(data_rq[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+                            np.median(sigmaclip(mixed_profiles[2][(20 + rad_displ):40])[0]))
+        res_small_ru.append(np.sum(data_ru[:(20 + rad_displ)]) - np.sum(circumference[:(20 + rad_displ)]) *
+                            np.median(sigmaclip(mixed_profiles[3][(20 + rad_displ):40])[0]))
 
     print([np.mean(res_iq), np.mean(res_rq)], [np.std(res_iq) / np.mean(res_iq), np.std(res_rq) / np.mean(res_rq)])
     print([np.mean(res_iu), np.mean(res_ru)], [np.std(res_iu) / np.mean(res_iu), np.std(res_ru) / np.mean(res_ru)])
+    results_big_mixed = np.array([np.mean(res_iq), np.mean(res_iu), np.mean(res_rq), np.mean(res_ru)])
     print()
 
     magnitude_wavelength_plot(HD100453_fluxes, (Rband_filter, Iband_filter))
@@ -188,6 +229,22 @@ def aperture_photometrie():
     print([np.mean(res_small_iq), np.mean(res_small_iu), np.mean(res_small_rq), np.mean(res_small_ru)],
           [np.std(res_small_iq) / np.mean(res_small_iq), np.std(res_small_iu) / np.mean(res_small_iu),
            np.std(res_small_rq) / np.mean(res_small_rq), np.std(res_small_ru) / np.mean(res_small_ru)])
+
+    results_small_mixed = np.array([np.mean(res_small_iq), np.mean(res_small_iu), np.mean(res_small_rq),
+                                    np.mean(res_small_ru)])
+    print()
+
+    # print("Scaled")
+    # print()
+    # print([np.mean(res_scal_small_iq), np.mean(res_scal_small_iu),
+    #        np.mean(res_scal_small_rq), np.mean(res_scal_small_ru)],
+    #       [np.std(res_scal_small_iq) / np.mean(res_scal_small_iq),
+    #        np.std(res_scal_small_iu) / np.mean(res_scal_small_iu),
+    #        np.std(res_scal_small_rq) / np.mean(res_scal_small_rq),
+    #        np.std(res_scal_small_ru) / np.mean(res_scal_small_ru)])
+    #
+    # results_small_scaled = np.array([np.mean(res_scal_small_iq), np.mean(res_scal_small_iu), np.mean(res_scal_small_rq),
+    #                                  np.mean(res_scal_small_ru)])
     print()
 
     print("Disk")
@@ -195,6 +252,20 @@ def aperture_photometrie():
     results_disk = photometrie_disk(28, 93, 124, cyc116.disk.get_pos(), cyc116.radial[0][0], cyc116.radial[1][0])
     print(results_disk)
     print(results_disk[1] / results_disk[0])
+    print()
+
+    print("Q frame")
+    results_u = photometrie_disk(28, 93, 124, cyc116.disk.get_pos(), cyc116.get_i_img()[1], cyc116.get_r_img()[1],
+                                 bg=True)
+    print(results_u)
+    print(results_u[1] / results_u[0])
+    print()
+
+    print("U frame")
+    results_u = photometrie_disk(28, 93, 124, cyc116.disk.get_pos(), cyc116.get_i_img()[3], cyc116.get_r_img()[3],
+                                 bg=True)
+    print(results_u)
+    print(results_u[1] / results_u[0])
     print()
 
     print("----- 3d Background -----")
@@ -217,7 +288,34 @@ def aperture_photometrie():
     print("Ghost 2")
     print(np.mean(results_3d_g2), np.std(results_3d_g2))
     print(results_g2)
+    print("IU")
+    photometrie_poly(20, 39, cyc116_second_star.get_pos(), cyc116.get_i_img()[2])
+    photometrie_poly(20, 39, cyc116_ghost2.get_pos(), cyc116.get_i_img()[2])
     print()
+
+    print("----- Ratios -----")
+    print("Big vs small")
+    print()
+    print("PSF")
+    print(np.array(results_small_psf[0][0]) / np.array(results_big[2][0]))
+    print(-2.5 * np.log10(np.array(results_small_psf[0][0]) / np.array(results_big[2][0])))
+    print()
+    print("Mixed")
+    print(np.array(results_small_mixed) / np.array(results_big_mixed))
+    print(-2.5 * np.log10(np.array(results_small_mixed) / np.array(results_big_mixed)))
+    print()
+    print("cyc116")
+    print()
+    for ind, obj in enumerate(cyc116.get_objects()):
+        print(obj.name)
+        small_ratio = results_small_cyc[ind][0] / np.array(results_small_mixed)
+        print(small_ratio)
+        print(np.mean(small_ratio[:2]), np.mean(small_ratio[2:]))
+        print(-2.5 * np.log10(np.mean(small_ratio[:2])) + 7.42, -2.5 * np.log10(np.mean(small_ratio[2:])) + 7.6)
+        print()
+    # print("Scaled")
+    # print(np.array(results_small_scaled) / np.array(results_big_scaled))
+    # print()
 
 
 """ GUI """
@@ -257,7 +355,7 @@ weights_nd4 = np.concatenate((np.full((21 - start_int,), 1), np.full((end_int - 
 weights_psf = np.concatenate((np.full((end_peak - start_peak,), 15), np.full_like(tail, 1)))
 bounds_psf = ([0, -np.inf, 0], np.inf)
 
-save = False
+save = True
 smart = False
 
 results = []
@@ -265,7 +363,8 @@ scal_profiles = []
 mixed_profiles = []
 star_profiles = []
 
-profile = ["I-band $I_Q$", "I-band $I_U$", "R-band $I_Q$", "R-band $I_U$"]
+circumference = [np.sum(aperture((1024, 1024), 512, 512, r, r - 1)) for r in range(1, 513)]
+profile = ["I-band", "I-band $I_U$", "R-band", "R-band $I_U$"]
 
 if save:
     folder = datetime.now().strftime('%d_%m_%H%M')
@@ -276,7 +375,6 @@ if save:
 
 for index, _ in enumerate(profile):
     print(profile[index])
-    # cyc116_img = cyc116.get_i_img()[0]
     radi, cyc116_profile = cyc116.azimuthal[index]
     _, nd4_profile = ND4.azimuthal[index]
 
@@ -324,11 +422,11 @@ for index, _ in enumerate(profile):
 
     ax = fig_comp.add_subplot(1, 1, 1)
     ax.tick_params(labelsize=18)
-    ax.plot(radi, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
-    ax.plot(radi, mixed_profile, '-D', label="mixed profile", markevery=list(tail))
+    ax.plot(radi, cyc116_profile, '-', label="profile of cyc116", markevery=markers_on_nd4)
+    ax.plot(radi, mixed_profile, '-', label="mixed profile", markevery=list(tail))
     nd4_equation = R"$({:.2})\cdot(ND4-({:.2}))$".format(*scaling_factor[0])
     ax.plot([], [], ' ', label=nd4_equation)
-    ax.plot(radi, star_profile, '-DC2', label="star profile", markevery=markers_on_psf)
+    ax.plot(radi, star_profile, '-C2', label="star profile", markevery=markers_on_psf)
     psf_equation = R"$({:.2})\cdot(gauss(PSF,{:.2})-({:.2}))$".format(*psf_factor[0])
     ax.plot([], [], ' ', label=psf_equation)
     ax.legend(fontsize='large', framealpha=1, loc=4)
@@ -338,9 +436,9 @@ for index, _ in enumerate(profile):
     zoom_xax = (0, 60)
 
     axins = ax.inset_axes([0.35, 0.55, 0.5, 0.43])
-    axins.semilogy(radi, cyc116_profile, '-D', label="profile of cyc116", markevery=markers_on_nd4)
-    axins.semilogy(radi, mixed_profile, '-D', label="mixed profile", markevery=list(tail))
-    axins.semilogy(radi, star_profile, '-D', label="Star profile", markevery=markers_on_psf)
+    axins.semilogy(radi, cyc116_profile, '-', label="profile of cyc116", markevery=markers_on_nd4)
+    axins.semilogy(radi, mixed_profile, '-', label="mixed profile", markevery=list(tail))
+    axins.semilogy(radi, star_profile, '-', label="Star profile", markevery=markers_on_psf)
     axins.set_ylim(
         (0.9 * np.min(star_profile[zoom_xax[0]:zoom_xax[1]]), 1.5 * np.max(star_profile[zoom_xax[0]:zoom_xax[1]])))
     axins.set_xlim((-3, 60))
@@ -354,17 +452,18 @@ for index, _ in enumerate(profile):
     ax = fig_sub.add_subplot(1, 1, 1)
     ax.tick_params(labelsize=18)
     line1, = ax.plot(radi, disk_profile, label="Reduced cyc116 profile")
+    ax.set_xlim(xmin=-3.5, xmax=130)
     ax1 = ax.twinx()
     ax1.tick_params(labelsize=18)
     line2, = ax1.plot(x2[20:], qphi[20:], "C3", label="Qphi profile")
     ax.tick_params(axis='y', labelcolor="C0")
     ax1.tick_params(axis='y', labelcolor="C3")
-    ax1.set_ylim(ymin=-10, ymax=1.1 * max(qphi[20:]))
-    ax.set_ylim(ymin=-100, ymax=1.1 * max(disk_profile[20:]))
+    ax1.set_ylim(ymin=-40, ymax=1.1 * max(qphi[20:120]))
+    ax.set_ylim(ymin=-500, ymax=1.1 * max(disk_profile[20:120]))
     line3 = ax.axhline(0, ls='--', c='k', alpha=0.5, label="zero")
     lines = [line1, line2, line3]
     align_yaxis(ax, 0, ax1, 0)
-    ax.fill_between([32, 118], [-110, -110], [1000, 1000], alpha=0.2, color="gold")
+    ax.fill_between([32, 118], [-3000, -3000], [1000, 1000], alpha=0.2, color="gold")
     ax.legend(lines, [line.get_label() for line in lines], fontsize='x-large', framealpha=1, loc=1)
 
     if save:
@@ -384,22 +483,22 @@ for index, _ in enumerate(profile):
         param_file.write(("PSF factor: {}\n".format(psf_factor[0])))
 
     disk_profile[disk_profile < 0] = 0
-    results.append([np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32), np.sum(qphi[24:118])])
-    print("Counts fit: ", np.sum(disk_profile[32:118]) - np.median(disk_profile[130:]) * (118 - 32))
-    print("Qphi counts: ", np.sum(qphi[24:118]))
+    count_disk = []
+    count_qphi = []
+    int_range = np.arange(-2, 3)
+    for inner_wiggle in int_range:
+        for outer_wiggle in int_range:
+            count_disk.append(np.sum((disk_profile * circumference)[(32 + inner_wiggle):(118 + outer_wiggle)]))
+            count_qphi.append(np.sum((qphi * circumference)[(32 + inner_wiggle):(118 + outer_wiggle)]))
+
+    print("Counts fit: ", np.mean(count_disk), np.std(count_disk))
+    print("Qphi counts: ", np.mean(count_qphi), np.std(count_qphi))
     print()
 
 if save:
     print("File saved")
     print()
     param_file.close()
-
-print("-------- Results --------")
-results = np.array(results)
-print(results)
-print("I/R: ", results[0] / results[2])
-print(2.5 * np.log10(results[0] / results[2]))
-print()
 
 """ comparison """
 print("--------- comparison ---------")
@@ -449,39 +548,6 @@ if save:
 
 """ Aperture photometrie """
 
-# aperture_photometrie()
-
-""" Diffraction disk """
-
-# for obj in [cyc116, ND4, PointSpread]:
-#     print(obj.name)
-#     x, radial = obj.azimuthal[0]
-#
-#     fig = plt.figure(num=obj.name)
-#     ax1 = fig.add_subplot(131)
-#     ax1.set_title("azimuthal rofile")
-#     ax1.semilogy(x, radial)
-#     ax2 = fig.add_subplot(132)
-#     ax2.set_title("first derivative")
-#     ax2.plot(x, np.gradient(radial))
-#     ax3 = fig.add_subplot(133)
-#     ax3.set_title("second derivative")
-#     sec = np.gradient(np.gradient(radial))
-#     sec_deriv_func = interpolate.interp1d(x, sec)
-#
-#
-#     def sec_deriv_sq(x):
-#         return sec_deriv_func(x) ** 2
-#
-#
-#     thin = np.linspace(x[0], x[-1], 10000)
-#     ax3.plot(thin, sec_deriv_sq(thin))
-#     results = diffraction_rings(radial, 19, width=10)
-#     print(np.array2string(results[0], precision=2))
-#     print(np.array2string(results[1], precision=2))
-#
-#     textax = plt.axes([0.5, 0.95, 0.3, 0.03])
-#     textax.axis('off')
-#     textax.text(0, 0, obj.name, fontsize=18, ha='center')
+aperture_photometrie()
 
 plt.show()

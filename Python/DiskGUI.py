@@ -127,9 +127,11 @@ def start(star_data: StarImg):
     def change_band(label):
         nonlocal disk_map
         if label == 'I\'-band':
-            disk_map = star_data.radial[0][0]
+            # disk_map = star_data.radial[0][0]
+            disk_map = star_data.get_i_img()[1]
         elif label == 'R\'-band':
-            disk_map = star_data.radial[1][0]
+            # disk_map = star_data.radial[1][0]
+            disk_map = star_data.get_i_img()[3]
         else:
             raise ValueError("How is this even possible...")
         disk_plot.set_data(disk_map)
